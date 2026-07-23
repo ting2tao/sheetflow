@@ -6,8 +6,8 @@
     </header>
 
     <main class="main">
-      <!-- Upload Section -->
-      <section class="card upload-section" v-if="!jobId">
+      <!-- Step 1: Upload Section -->
+      <section class="card upload-section" v-if="step === 1">
         <h2>📁 上传Excel文件</h2>
         <div
           class="drop-zone"
@@ -38,10 +38,52 @@
           style="display: none"
           @change="handleFileSelect"
         >
+        <button
+          v-if="file"
+          class="btn-primary"
+          @click="uploadFile"
+          :disabled="isUploading"
+        >
+          {{ isUploading ? '上传中...' : '📤 上传并解析' }}
+        </button>
       </section>
 
-      <!-- Settings Section -->
-      <section class="card settings-section" v-if="file && !jobId">
+      <!-- Step 2: Sheet Selection & Settings -->
+      <section class="card settings-section" v-if="step === 2">
+        <h2>📋 选择Sheet</h2>
+
+        <div class="sheets-list">
+          <div class="select-all">
+            <label>
+              <input
+                type="checkbox"
+                :checked="allSelected"
+                @change="toggleAllSheets"
+              >
+              <span>全选</span>
+            </label>
+          </div>
+
+          <div
+            v-for="sheet in sheets"
+            :key="sheet.index"
+            class="sheet-item"
+            :class="{ selected: selectedSheets.includes(sheet.index) }"
+          >
+            <label>
+              <input
+                type="checkbox"
+                :value="sheet.index"
+                v-model="selectedSheets"
+              >
+              <div class="sheet-info">
+                <span class="sheet-name">{{ sheet.name }}</span>
+                <span class="sheet-meta">{{ sheet.rows }} 行 × {{ sheet.columns }} 列</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
         <h2>⚙️ 分页设置</h2>
         <div class="settings-grid">
           <div class="setting-item">
@@ -92,26 +134,52 @@
             <span class="setting-hint">{{ quality }}%</span>
           </div>
         </div>
-        <button class="btn-primary" @click="startRender" :disabled="isProcessing">
-          {{ isProcessing ? '处理中...' : '🚀 开始生成' }}
-        </button>
+
+        <div class="action-buttons">
+          <button class="btn-secondary" @click="goBack">
+            ← 返回
+          </button>
+          <button
+            class="btn-primary"
+            @click="startRender"
+            :disabled="selectedSheets.length === 0 || isProcessing"
+          >
+            {{ isProcessing ? '处理中...' : `🚀 开始生成 (${selectedSheets.length}个Sheet)` }}
+          </button>
+        </div>
       </section>
 
-      <!-- Progress Section -->
-      <section class="card progress-section" v-if="jobId">
+      <!-- Step 3: Progress Section -->
+      <section class="card progress-section" v-if="step === 3">
         <h2>⏳ 任务进度</h2>
         <div class="progress-content">
           <div class="progress-status">
             <span class="status-icon" :class="statusClass">{{ statusIcon }}</span>
             <span class="status-text">{{ statusMessage }}</span>
           </div>
+
           <div class="progress-bar-container" v-if="status !== 'completed' && status !== 'error'">
             <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
           </div>
+
           <div class="job-info" v-if="jobInfo">
+            <p v-if="jobInfo.total_sheets">处理Sheet数: {{ jobInfo.total_sheets }}</p>
+            <p v-if="jobInfo.sheets_processed !== undefined">
+              已完成: {{ jobInfo.sheets_processed }} / {{ jobInfo.total_sheets }}
+            </p>
+            <p v-if="jobInfo.current_sheet">当前处理: {{ jobInfo.current_sheet }}</p>
             <p v-if="jobInfo.total_pages">总页数: {{ jobInfo.total_pages }}</p>
-            <p v-if="jobInfo.filename">文件: {{ jobInfo.filename }}</p>
           </div>
+
+          <!-- Completed sheets info -->
+          <div v-if="status === 'completed' && jobInfo?.sheets" class="completed-sheets">
+            <h3>✅ 处理完成</h3>
+            <div v-for="sheet in jobInfo.sheets" :key="sheet.index" class="completed-sheet">
+              <span class="sheet-name">{{ sheet.name }}</span>
+              <span class="sheet-pages">{{ sheet.pages }} 页</span>
+            </div>
+          </div>
+
           <div class="action-buttons">
             <button
               v-if="status === 'completed'"
@@ -138,24 +206,42 @@
 </template>
 
 <script>
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed, onUnmounted, watch } from 'vue'
 
 export default {
   name: 'App',
   setup() {
+    // Step management
+    const step = ref(1)  // 1: upload, 2: settings, 3: progress
+
+    // Upload state
     const file = ref(null)
     const fileInput = ref(null)
     const isDragOver = ref(false)
+    const isUploading = ref(false)
+
+    // Sheet selection
+    const jobId = ref(null)
+    const sheets = ref([])
+    const selectedSheets = ref([])
+
+    // Settings
     const headerRows = ref(1)
     const pageSize = ref(10)
     const format = ref('png')
     const quality = ref(90)
-    const jobId = ref(null)
+
+    // Progress
     const status = ref('')
     const statusMessage = ref('')
     const jobInfo = ref(null)
     const isProcessing = ref(false)
     let pollTimer = null
+
+    // Computed
+    const allSelected = computed(() => {
+      return sheets.value.length > 0 && selectedSheets.value.length === sheets.value.length
+    })
 
     const statusClass = computed(() => {
       switch (status.value) {
@@ -171,9 +257,7 @@ export default {
         case 'error': return '❌'
         case 'queued': return '⏳'
         case 'parsing': return '📖'
-        case 'paginating': return '📄'
-        case 'rendering': return '🎨'
-        case 'screenshotting': return '📸'
+        case 'processing': return '⚙️'
         case 'zipping': return '📦'
         default: return '⏳'
       }
@@ -183,9 +267,7 @@ export default {
       const progressMap = {
         'queued': 10,
         'parsing': 20,
-        'paginating': 30,
-        'rendering': 50,
-        'screenshotting': 70,
+        'processing': 50,
         'zipping': 90,
         'completed': 100,
         'error': 100,
@@ -193,6 +275,7 @@ export default {
       return progressMap[status.value] || 0
     })
 
+    // Methods
     const triggerFileInput = () => {
       fileInput.value?.click()
     }
@@ -229,15 +312,65 @@ export default {
       return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
     }
 
-    const startRender = async () => {
+    const uploadFile = async () => {
       if (!file.value) return
+
+      isUploading.value = true
+      const formData = new FormData()
+      formData.append('file', file.value)
+
+      try {
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          throw new Error(error.detail || '上传失败')
+        }
+
+        const data = await response.json()
+        jobId.value = data.job_id
+        sheets.value = data.sheets || []
+
+        // Select all sheets by default
+        selectedSheets.value = sheets.value.map(s => s.index)
+
+        // Move to step 2
+        step.value = 2
+      } catch (error) {
+        alert('错误: ' + error.message)
+      } finally {
+        isUploading.value = false
+      }
+    }
+
+    const toggleAllSheets = () => {
+      if (allSelected.value) {
+        selectedSheets.value = []
+      } else {
+        selectedSheets.value = sheets.value.map(s => s.index)
+      }
+    }
+
+    const goBack = () => {
+      step.value = 1
+      jobId.value = null
+      sheets.value = []
+      selectedSheets.value = []
+    }
+
+    const startRender = async () => {
+      if (!jobId.value || selectedSheets.value.length === 0) return
 
       isProcessing.value = true
       const formData = new FormData()
-      formData.append('file', file.value)
+      formData.append('job_id', jobId.value)
       formData.append('header_rows', headerRows.value)
       formData.append('page_size', pageSize.value)
       formData.append('format', format.value)
+      formData.append('sheet_indices', selectedSheets.value.join(','))
       if (format.value === 'jpg') {
         formData.append('quality', quality.value)
       }
@@ -254,9 +387,11 @@ export default {
         }
 
         const data = await response.json()
-        jobId.value = data.job_id
         status.value = data.status
         statusMessage.value = data.message
+
+        // Move to step 3
+        step.value = 3
 
         // Start polling for status
         startPolling()
@@ -294,8 +429,11 @@ export default {
     }
 
     const resetForm = () => {
+      step.value = 1
       file.value = null
       jobId.value = null
+      sheets.value = []
+      selectedSheets.value = []
       status.value = ''
       statusMessage.value = ''
       jobInfo.value = null
@@ -315,18 +453,23 @@ export default {
     })
 
     return {
+      step,
       file,
       fileInput,
       isDragOver,
+      isUploading,
+      jobId,
+      sheets,
+      selectedSheets,
       headerRows,
       pageSize,
       format,
       quality,
-      jobId,
       status,
       statusMessage,
       jobInfo,
       isProcessing,
+      allSelected,
       statusClass,
       statusIcon,
       progressPercent,
@@ -335,6 +478,9 @@ export default {
       handleDrop,
       removeFile,
       formatFileSize,
+      uploadFile,
+      toggleAllSheets,
+      goBack,
       startRender,
       downloadResult,
       resetForm,
@@ -402,6 +548,7 @@ body {
   text-align: center;
   cursor: pointer;
   transition: all 0.3s ease;
+  margin-bottom: 20px;
 }
 
 .drop-zone:hover {
@@ -478,6 +625,67 @@ body {
 
 .btn-remove:hover {
   background: #ff6b81;
+}
+
+/* Sheets List */
+.sheets-list {
+  margin-bottom: 25px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.select-all {
+  padding: 12px 15px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+  font-weight: 600;
+}
+
+.sheet-item {
+  padding: 12px 15px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.2s;
+}
+
+.sheet-item:last-child {
+  border-bottom: none;
+}
+
+.sheet-item:hover {
+  background: #f8f9ff;
+}
+
+.sheet-item.selected {
+  background: #eef0ff;
+}
+
+.sheet-item label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.sheet-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.sheet-info {
+  flex: 1;
+}
+
+.sheet-name {
+  display: block;
+  font-weight: 600;
+  color: #333;
+}
+
+.sheet-meta {
+  font-size: 0.85rem;
+  color: #888;
 }
 
 /* Settings */
@@ -597,6 +805,15 @@ input[type="range"] {
   background: #e0e0e0;
 }
 
+.action-buttons {
+  display: flex;
+  gap: 15px;
+}
+
+.action-buttons button {
+  flex: 1;
+}
+
 /* Progress */
 .progress-content {
   text-align: center;
@@ -643,10 +860,38 @@ input[type="range"] {
   margin: 5px 0;
 }
 
-.action-buttons {
+.completed-sheets {
+  background: #f0fff0;
+  border: 1px solid #4caf50;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.completed-sheets h3 {
+  color: #4caf50;
+  margin-bottom: 10px;
+}
+
+.completed-sheet {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.completed-sheet:last-child {
+  border-bottom: none;
+}
+
+.completed-sheet .sheet-name {
+  color: #333;
+}
+
+.completed-sheet .sheet-pages {
+  color: #4caf50;
+  font-weight: 600;
 }
 
 /* Footer */
@@ -661,14 +906,6 @@ input[type="range"] {
 @media (min-width: 600px) {
   .settings-grid {
     grid-template-columns: 1fr 1fr;
-  }
-
-  .action-buttons {
-    flex-direction: row;
-  }
-
-  .action-buttons button {
-    flex: 1;
   }
 }
 </style>
