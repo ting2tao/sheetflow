@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SheetFlow - Page {{ page_number }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                         "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue",
+                         Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+            background: #fff;
+            padding: 0;
+            margin: 0;
+        }
+
+        .table-container {
+            display: inline-block;
+            min-width: 100%;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+            width: auto;
+            min-width: 100%;
+        }
+
+        td {
+            padding: 6px 8px;
+            border: 1px solid #000;
+            vertical-align: middle;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        /* Default styles when no Excel style is applied */
+        td:not([style]) {
+            border: 1px solid #000;
+        }
+
+        /* Header rows get slightly different default */
+        tr:first-child td,
+        tr:nth-child(2) td,
+        tr:nth-child(3) td {
+            font-weight: bold;
+        }
+
+        /* Ensure merged cells display properly */
+        td[colspan],
+        td[rowspan] {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="table-container">
+        <table>
+            {% if col_widths %}
+            <colgroup>
+                {% for width in col_widths %}
+                <col style="width: {{ width }}">
+                {% endfor %}
+            </colgroup>
+            {% endif %}
+
+            {% for row in rows %}
+            <tr>
+                {% for cell in row %}
+                <td
+                    {% if cell.colspan > 1 %}colspan="{{ cell.colspan }}"{% endif %}
+                    {% if cell.rowspan > 1 %}rowspan="{{ cell.rowspan }}"{% endif %}
+                    {% if cell.style %}style="{{ cell.style }}"{% endif %}
+                >{{ cell.value }}</td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+</body>
+</html>
