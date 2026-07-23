@@ -195,6 +195,8 @@ def render_page_html(
                 excel_width = column_widths[i + 1]
                 # Excel width to pixels: approximately 7 pixels per unit + padding
                 px = int(excel_width * 7 + 16)
+                # Ensure minimum width for 4 Chinese characters
+                px = max(px, 96)
                 col_widths.append(f"{px}px")
             else:
                 # Calculate max content width for this column
@@ -208,8 +210,9 @@ def render_page_html(
                 # Add padding (8px left + 8px right = 16px) and buffer
                 total_width = max_content_width + 24
 
-                # Set minimum width
-                min_width = 80
+                # Set minimum width: at least 4 Chinese characters (16px each) + padding
+                # 4 * 16 + 24 = 88px, round up to 96px for safety
+                min_width = 96
                 final_width = max(total_width, min_width)
                 col_widths.append(f"{final_width}px")
 
