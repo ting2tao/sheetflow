@@ -166,11 +166,40 @@ def _get_row_heights(worksheet) -> Dict[int, float]:
     return heights
 
 
-def parse_excel(file_path: str) -> WorkbookModel:
+def get_sheet_list(file_path: str) -> list:
+    """Quickly get sheet names and dimensions without parsing all data.
+
+    Args:
+        file_path: Path to the .xlsx file
+
+    Returns:
+        List of dicts with index, name, rows, columns
+    """
+    wb = load_workbook(file_path, read_only=True, data_only=True)
+    sheets = []
+
+    for i, sheet_name in enumerate(wb.sheetnames):
+        ws = wb[sheet_name]
+        # In read_only mode, max_row and max_column might be None
+        max_row = ws.max_row if ws.max_row is not None else 0
+        max_col = ws.max_column if ws.max_column is not None else 0
+        sheets.append({
+            "index": i,
+            "name": sheet_name,
+            "rows": max_row,
+            "columns": max_col,
+        })
+
+    wb.close()
+    return sheets
+
+
+def parse_excel(file_path: str, sheet_indices: list = None) -> WorkbookModel:
     """Parse an Excel file and return structured data.
 
     Args:
         file_path: Path to the .xlsx file
+        sheet_indices: List of sheet indices to parse. None means parse all.
 
     Returns:
         WorkbookModel with all sheets, cells, styles, and merge info
@@ -178,7 +207,17 @@ def parse_excel(file_path: str) -> WorkbookModel:
     wb = load_workbook(file_path, data_only=True)
     model = WorkbookModel()
 
-    for sheet_name in wb.sheetnames:
+    # Determine which sheets to parse
+    if sheet_indices is not None:
+        sheet_names = [
+            wb.sheetnames[i]
+            for i in sheet_indices
+            if 0 <= i < len(wb.sheetnames)
+        ]
+    else:
+        sheet_names = wb.sheetnames
+
+    for sheet_name in sheet_names:
         ws = wb[sheet_name]
 
         sheet = SheetModel(

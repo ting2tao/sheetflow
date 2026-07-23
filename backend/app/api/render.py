@@ -18,7 +18,7 @@ from typing import Optional, Literal, List
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 
-from app.services.excel_parser import parse_excel, WorkbookModel
+from app.services.excel_parser import parse_excel, get_sheet_list, WorkbookModel
 from app.services.paginator import paginate
 from app.services.html_renderer import render_page_html
 from app.services.screenshot import batch_capture, close_browser
@@ -277,7 +277,7 @@ async def _process_render_job(
 
 
 @router.get("/sheets/{job_id}")
-async def get_sheet_list(job_id: str):
+async def get_sheets_for_job(job_id: str):
     """Get list of sheets in the uploaded Excel file."""
     job = _load_job(job_id)
     if not job:
@@ -288,15 +288,7 @@ async def get_sheet_list(job_id: str):
         raise HTTPException(status_code=400, detail="文件不存在，请重新上传")
 
     try:
-        workbook = parse_excel(file_path)
-        sheets = []
-        for i, sheet in enumerate(workbook.sheets):
-            sheets.append({
-                "index": i,
-                "name": sheet.name,
-                "rows": len(sheet.rows),
-                "columns": sheet.max_col,
-            })
+        sheets = get_sheet_list(file_path)
         return {"sheets": sheets}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"解析失败: {str(e)}")
@@ -324,17 +316,9 @@ async def upload_file(file: UploadFile = File(...)):
     with open(upload_path, 'wb') as f:
         f.write(content)
 
-    # Parse to get sheet list
+    # Quick parse to get sheet list (without parsing all data)
     try:
-        workbook = parse_excel(upload_path)
-        sheets = []
-        for i, sheet in enumerate(workbook.sheets):
-            sheets.append({
-                "index": i,
-                "name": sheet.name,
-                "rows": len(sheet.rows),
-                "columns": sheet.max_col,
-            })
+        sheets = get_sheet_list(upload_path)
     except Exception as e:
         os.remove(upload_path)
         raise HTTPException(status_code=400, detail=f"Excel解析失败: {str(e)}")
