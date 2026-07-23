@@ -30,6 +30,14 @@ storage/outputs/*
 !storage/jobs/.gitkeep
 !storage/outputs/.gitkeep
 
+# Backend storage (runtime data)
+backend/storage/uploads/*
+backend/storage/jobs/*
+backend/storage/outputs/*
+!backend/storage/uploads/.gitkeep
+!backend/storage/jobs/.gitkeep
+!backend/storage/outputs/.gitkeep
+
 # OS
 .DS_Store
 Thumbs.db
