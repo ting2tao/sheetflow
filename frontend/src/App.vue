@@ -244,7 +244,7 @@ export default {
 
     // Settings
     const headerRows = ref(1)
-    const pageSize = ref(10)
+    const pageSize = ref(1)
     const format = ref('png')
     const quality = ref(90)
 
