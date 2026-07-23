@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y \
     gnupg \
     fonts-wqy-zenhei \
     fonts-wqy-microhei \
+    fonts-unifont \
+    fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for caching
@@ -15,7 +17,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Playwright browsers
-RUN playwright install --with-deps chromium
+RUN playwright install chromium
+RUN playwright install-deps chromium || true
 
 # Copy application code
 COPY . .
