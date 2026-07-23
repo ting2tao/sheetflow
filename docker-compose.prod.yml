@@ -4,7 +4,7 @@ services:
     container_name: sheetflow-backend
     restart: always
     ports:
-      - "8000:8000"
+      - "8010:8000"
     volumes:
       - ${DATA_DIR:-/root/sheetflow-data}:/app/storage
     environment:
@@ -21,6 +21,6 @@ services:
     container_name: sheetflow-frontend
     restart: always
     ports:
-      - "80:80"
+      - "3010:80"
     depends_on:
       - backend
