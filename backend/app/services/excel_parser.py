@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from openpyxl import load_workbook
 from openpyxl.styles import Font, PatternFill, Border, Alignment
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import get_column_letter, column_index_from_string
 
 
 @dataclass
@@ -149,8 +149,11 @@ def _get_column_widths(worksheet) -> Dict[int, float]:
     widths = {}
     for col_letter, dim in worksheet.column_dimensions.items():
         if dim.width:
-            col_idx = ord(col_letter) - ord('A') + 1
-            widths[col_idx] = dim.width
+            try:
+                col_idx = column_index_from_string(col_letter)
+                widths[col_idx] = dim.width
+            except ValueError:
+                continue
     return widths
 
 
