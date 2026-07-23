@@ -1,0 +1,221 @@
+name: Deploy to Aliyun ECS
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (e.g. v1.0.0). Leave empty to use latest.'
+        required: false
+        default: 'latest'
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-aliyun
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_PATH: ${{ secrets.ALIYUN_DEPLOY_PATH || '/opt/sheetflow' }}
+      DATA_DIR: ${{ secrets.ALIYUN_DATA_DIR || '/root/sheetflow-data' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment secrets
+        env:
+          ALIYUN_HOST: ${{ secrets.ALIYUN_HOST }}
+          ALIYUN_USER: ${{ secrets.ALIYUN_USER }}
+          ALIYUN_SSH_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+        run: |
+          set -eu
+
+          missing=''
+
+          for key in ALIYUN_HOST ALIYUN_USER ALIYUN_SSH_KEY; do
+            eval "value=\${$key:-}"
+            if [ -z "$value" ]; then
+              missing="$missing $key"
+            fi
+          done
+
+          if [ -n "$missing" ]; then
+            echo "Missing required GitHub Actions secrets:$missing"
+            exit 1
+          fi
+
+      - name: Resolve image tag
+        id: vars
+        run: |
+          IMAGE_TAG="${{ inputs.image_tag }}"
+
+          if [ -z "$IMAGE_TAG" ]; then
+            IMAGE_TAG="latest"
+          fi
+
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure deploy directory exists on ECS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          port: ${{ secrets.ALIYUN_PORT || 22 }}
+          debug: true
+          script_stop: true
+          script: mkdir -p "${{ env.DEPLOY_PATH }}"
+
+      - name: Copy compose file to ECS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          port: ${{ secrets.ALIYUN_PORT || 22 }}
+          source: docker-compose.prod.yml
+          target: ${{ env.DEPLOY_PATH }}
+
+      - name: Deploy on ECS
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.image_tag }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          DATA_DIR: ${{ env.DATA_DIR }}
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          port: ${{ secrets.ALIYUN_PORT || 22 }}
+          envs: IMAGE_TAG,GHCR_USERNAME,GHCR_TOKEN,DEPLOY_PATH,DATA_DIR
+          debug: true
+          script_stop: true
+          script: |
+            set -eu
+
+            log() {
+              echo "[deploy] $*"
+            }
+
+            fail() {
+              echo "[deploy] ERROR: $*" >&2
+              exit 1
+            }
+
+            log "host=$(hostname)"
+            log "user=$(id -un)"
+            log "deploy_path=$DEPLOY_PATH"
+            log "data_dir=${DATA_DIR:-/root/sheetflow-data}"
+            log "image_tag=${IMAGE_TAG:-latest}"
+
+            if ! command -v docker >/dev/null 2>&1; then
+              fail "docker is not installed on ECS"
+            fi
+
+            DOCKER_BIN='docker'
+
+            log "docker_bin=$(command -v docker)"
+            docker --version || true
+            id || true
+            groups || true
+            ls -l /var/run/docker.sock || true
+
+            if docker info >/tmp/sheetflow-docker-info.log 2>&1; then
+              log "docker daemon is reachable with current SSH user"
+            elif command -v sudo >/dev/null 2>&1 && sudo -n docker info >/tmp/sheetflow-docker-info.log 2>&1; then
+              DOCKER_BIN='sudo docker'
+              log "docker daemon is reachable via sudo"
+            else
+              log "docker info output:"
+              cat /tmp/sheetflow-docker-info.log || true
+              fail "docker daemon is unreachable, or the SSH user lacks permission to access Docker"
+            fi
+
+            docker_run() {
+              if [ "$DOCKER_BIN" = 'docker' ]; then
+                docker "$@"
+              else
+                sudo docker "$@"
+              fi
+            }
+
+            COMPOSE_READY=''
+
+            set +e
+            docker_run compose version >/tmp/sheetflow-compose-version.log 2>&1
+            compose_plugin_status=$?
+            set -e
+
+            if [ "$compose_plugin_status" -eq 0 ]; then
+              compose() { docker_run compose "$@"; }
+              COMPOSE_READY='1'
+              log "using docker compose"
+            fi
+
+            if [ -z "$COMPOSE_READY" ] && command -v docker-compose >/dev/null 2>&1; then
+              set +e
+              docker-compose version >/tmp/sheetflow-docker-compose-version.log 2>&1
+              docker_compose_status=$?
+              set -e
+
+              if [ "$docker_compose_status" -eq 0 ]; then
+                compose() { docker-compose "$@"; }
+                COMPOSE_READY='1'
+                log "using docker-compose"
+              fi
+            fi
+
+            if [ -z "$COMPOSE_READY" ]; then
+              log "docker compose version output:"
+              cat /tmp/sheetflow-compose-version.log || true
+              log "docker-compose version output:"
+              cat /tmp/sheetflow-docker-compose-version.log || true
+              fail "docker compose is unavailable"
+            fi
+
+            log "prepare deploy directory"
+            mkdir -p "$DEPLOY_PATH"
+            cd "$DEPLOY_PATH"
+
+            if [ ! -f docker-compose.prod.yml ]; then
+              ls -la "$DEPLOY_PATH" || true
+              fail "docker-compose.prod.yml not found in $DEPLOY_PATH"
+            fi
+
+            if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
+              log "login to ghcr.io as $GHCR_USERNAME"
+              if ! echo "$GHCR_TOKEN" | docker_run login ghcr.io -u "$GHCR_USERNAME" --password-stdin; then
+                fail "docker login to ghcr.io failed"
+              fi
+            else
+              log "GHCR credentials are empty. Skip docker login (works only for public images)."
+            fi
+
+            log "prepare data directory"
+            mkdir -p "$DATA_DIR"
+
+            log "validate compose file"
+            if ! IMAGE_TAG="$IMAGE_TAG" DATA_DIR="$DATA_DIR" compose -f docker-compose.prod.yml config >/dev/null; then
+              fail "docker compose config validation failed"
+            fi
+
+            log "pull images"
+            if ! IMAGE_TAG="$IMAGE_TAG" DATA_DIR="$DATA_DIR" compose -f docker-compose.prod.yml pull; then
+              fail "docker compose pull failed"
+            fi
+
+            log "start containers"
+            if ! IMAGE_TAG="$IMAGE_TAG" DATA_DIR="$DATA_DIR" compose -f docker-compose.prod.yml up -d --remove-orphans; then
+              fail "docker compose up failed"
+            fi
+
+            compose -f docker-compose.prod.yml ps || true
+
+            docker_run image prune -f || true
