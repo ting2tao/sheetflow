@@ -52,8 +52,8 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/ting2tao/excel-screenshot.git
-cd excel-screenshot
+git clone https://github.com/ting2tao/sheetflow.git
+cd sheetflow
 
 # 启动服务
 docker-compose up -d

@@ -52,8 +52,8 @@ English | [中文](./README_CN.md)
 
 ```bash
 # Clone the repository
-git clone https://github.com/ting2tao/excel-screenshot.git
-cd excel-screenshot
+git clone https://github.com/ting2tao/sheetflow.git
+cd sheetflow
 
 # Start services
 docker-compose up -d
