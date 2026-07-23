@@ -12,6 +12,35 @@ from app.services.excel_parser import Cell, CellStyle, MergedCell
 from app.services.paginator import Page
 
 
+def _calculate_text_width(text: str) -> int:
+    """Calculate approximate text width in pixels.
+
+    Args:
+        text: Text to measure
+
+    Returns:
+        Estimated width in pixels
+    """
+    if not text:
+        return 0
+
+    width = 0
+    for char in str(text):
+        code = ord(char)
+        # CJK Unified Ideographs and other wide characters
+        if (0x4E00 <= code <= 0x9FFF or  # CJK Unified Ideographs
+            0x3000 <= code <= 0x303F or  # CJK Symbols and Punctuation
+            0xFF00 <= code <= 0xFFEF or  # Fullwidth Forms
+            0x3400 <= code <= 0x4DBF or  # CJK Unified Ideographs Extension A
+            0x2E80 <= code <= 0x2EFF):   # CJK Radicals Supplement
+            width += 16  # Chinese/Japanese/Korean characters
+        elif code > 127:
+            width += 10  # Other non-ASCII characters
+        else:
+            width += 8   # ASCII characters
+    return width
+
+
 def _cell_style_to_css(style: CellStyle) -> str:
     """Convert CellStyle to inline CSS string."""
     css_parts = []
@@ -160,41 +189,29 @@ def render_page_html(
     if table_rows:
         max_cols = max(len(row) for row in table_rows) if table_rows else 0
 
-        # Calculate max content width per column if no Excel widths provided
-        if not column_widths:
-            # Estimate width based on content
-            for col_idx in range(max_cols):
-                max_chars = 0
+        for i in range(max_cols):
+            # Check if we have an existing width from Excel
+            if column_widths and (i + 1) in column_widths:
+                excel_width = column_widths[i + 1]
+                # Excel width to pixels: approximately 7 pixels per unit + padding
+                px = int(excel_width * 7 + 16)
+                col_widths.append(f"{px}px")
+            else:
+                # Calculate max content width for this column
+                max_content_width = 0
                 for row in table_rows:
-                    if col_idx < len(row):
-                        cell_value = row[col_idx].get("value", "")
-                        # Count characters (CJK chars count as 2)
-                        char_count = sum(2 if ord(c) > 127 else 1 for c in str(cell_value))
-                        max_chars = max(max_chars, char_count)
-                # Default width: max_chars * 8 + padding
-                default_width = max(max_chars * 8 + 24, 80)  # Min 80px
-                col_widths.append(f"{default_width}px")
-        else:
-            for i in range(1, max_cols + 1):
-                width = column_widths.get(i)
-                if width:
-                    # Excel width to pixels conversion
-                    # Excel width is based on character count (default font Calibri 11pt)
-                    # 1 character ≈ 7-8 pixels at default size
-                    # For Chinese characters, need ~14-16 pixels each
-                    # Add padding (16px total) and some buffer
-                    # Formula: width * 12 + 16 (padding) gives reasonable results
-                    col_widths.append(f"{int(width * 12 + 16)}px")
-                else:
-                    # No width for this column, use content-based estimate
-                    max_chars = 0
-                    for row in table_rows:
-                        if i - 1 < len(row):
-                            cell_value = row[i - 1].get("value", "")
-                            char_count = sum(2 if ord(c) > 127 else 1 for c in str(cell_value))
-                            max_chars = max(max_chars, char_count)
-                    default_width = max(max_chars * 8 + 24, 80)
-                    col_widths.append(f"{default_width}px")
+                    if i < len(row):
+                        cell_value = row[i].get("value", "")
+                        text_width = _calculate_text_width(cell_value)
+                        max_content_width = max(max_content_width, text_width)
+
+                # Add padding (8px left + 8px right = 16px) and buffer
+                total_width = max_content_width + 24
+
+                # Set minimum width
+                min_width = 80
+                final_width = max(total_width, min_width)
+                col_widths.append(f"{final_width}px")
 
     return template.render(
         rows=table_rows,
