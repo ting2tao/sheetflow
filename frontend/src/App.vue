@@ -205,6 +205,54 @@
   </div>
 </template>
 
+<!-- SEO Content rendered outside Vue app for crawlers -->
+<div id="seo-content" style="max-width: 800px; margin: 0 auto; padding: 20px;">
+  <noscript>
+    <section style="background: white; border-radius: 12px; padding: 40px 30px; margin-top: 40px;">
+      <h2>🎯 SheetFlow 是什么？</h2>
+      <p>SheetFlow 是一款免费的在线 Excel 转图片工具。只需上传 Excel 文件，设置分页规则，即可自动生成多张高质量图片并打包下载。</p>
+
+      <h2>✨ 核心功能</h2>
+      <ul>
+        <li><strong>Excel 转图片</strong> - 支持 .xlsx 格式，保留表格样式</li>
+        <li><strong>智能分页</strong> - 自定义表头行数和每页数据行数</li>
+        <li><strong>固定表头</strong> - 每张图片都包含固定表头信息</li>
+        <li><strong>多格式输出</strong> - 支持 PNG 和 JPG 格式</li>
+        <li><strong>批量处理</strong> - 支持多 Sheet 一并处理</li>
+        <li><strong>一键下载</strong> - 自动打包 ZIP 文件</li>
+      </ul>
+
+      <h2>📋 适用场景</h2>
+      <ul>
+        <li>💰 <strong>退款单生成</strong> - 批量生成退款单图片，方便客服发送给客户</li>
+        <li>📦 <strong>订单截图</strong> - 将订单数据转换为图片，用于存档或分享</li>
+        <li>📊 <strong>数据报表</strong> - 将 Excel 报表转换为图片，便于展示和汇报</li>
+        <li>🎨 <strong>运营素材</strong> - 快速生成运营活动所需的表格图片素材</li>
+      </ul>
+
+      <h2>🚀 使用方法</h2>
+      <ol>
+        <li>上传 Excel 文件（.xlsx 格式）</li>
+        <li>选择要处理的 Sheet</li>
+        <li>设置表头行数和每页数据行数</li>
+        <li>选择输出格式（PNG 或 JPG）</li>
+        <li>点击"开始生成"</li>
+        <li>下载 ZIP 文件</li>
+      </ol>
+
+      <h2>❓ 常见问题</h2>
+      <h3>支持哪些 Excel 格式？</h3>
+      <p>目前支持 .xlsx 格式。后续版本将支持 .xls 和 .csv 格式。</p>
+      <h3>支持复杂的 Excel 公式吗？</h3>
+      <p>SheetFlow 会读取公式的计算结果值，但不会重新计算公式。</p>
+      <h3>图片质量如何？</h3>
+      <p>默认使用 2x 分辨率生成，确保图片清晰。PNG 格式无损压缩，JPG 格式可调节质量。</p>
+      <h3>文件大小有限制吗？</h3>
+      <p>建议文件大小不超过 10MB，行数不超过 10000 行，以获得最佳体验。</p>
+    </section>
+  </noscript>
+</div>
+
 <script>
 import { ref, computed, onUnmounted, watch } from 'vue'
 
