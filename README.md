@@ -1,149 +1,230 @@
 # SheetFlow
 
-**表格分页图片生成器**
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="version">
+  <img src="https://img.shields.io/badge/python-3.11+-green.svg" alt="python">
+  <img src="https://img.shields.io/badge/vue-3.x-brightgreen.svg" alt="vue">
+  <img src="https://img.shields.io/badge/license-MIT-yellow.svg" alt="license">
+</p>
 
-上传 Excel 表格，根据固定表头和分页规则，自动生成多张图片，并打包 ZIP 下载。
+**Excel Pagination Image Generator**
 
-## ✨ 功能特性
+Upload Excel spreadsheets, automatically generate paginated images based on fixed headers and pagination rules, then download as ZIP.
 
-- 📁 支持 .xlsx 格式 Excel 文件
-- 🔧 可设置表头行数和每页数据行数
-- 🖼️ 生成 PNG/JPG 格式图片
-- 📦 自动打包 ZIP 下载
-- 🎨 保留表格样式（字体、颜色、边框、合并单元格）
-- 📱 响应式 Web 界面
+English | [中文](./README_CN.md)
 
-## 🚀 快速开始
+---
 
-### 使用 Docker（推荐）
+## ✨ Features
 
-```bash
-# 克隆项目
-git clone <repository-url>
-cd sheetflow
+- 📁 Support `.xlsx` Excel files
+- 🔧 Configurable header rows and data rows per page
+- 🖼️ Generate PNG/JPG format images
+- 📦 Automatic ZIP packaging for download
+- 🎨 Preserve table styles (fonts, colors, borders, merged cells)
+- 📱 Responsive web interface
 
-# 启动服务
-docker-compose up -d
+## 📸 Preview
 
-# 访问 http://localhost
+```
+┌─────────────────────────────────────┐
+│         📊 SheetFlow                │
+│    Excel Pagination Image Generator │
+├─────────────────────────────────────┤
+│                                     │
+│    ┌───────────────────────────┐    │
+│    │    📁 Drag & Drop File    │    │
+│    │    or Click to Select     │    │
+│    └───────────────────────────┘    │
+│                                     │
+│    Header Rows: [  3  ]             │
+│    Data Rows:   [ 10  ]             │
+│    Format:      ○ PNG  ○ JPG        │
+│                                     │
+│    [      🚀 Generate      ]        │
+│                                     │
+└─────────────────────────────────────┘
 ```
 
-### 本地开发
+## 🚀 Quick Start
 
-#### 后端
+### Using Docker (Recommended)
+
+```bash
+# Clone the repository
+git clone https://github.com/ting2tao/excel-screenshot.git
+cd excel-screenshot
+
+# Start services
+docker-compose up -d
+
+# Visit http://localhost
+```
+
+### Local Development
+
+#### Backend
 
 ```bash
 cd backend
 
-# 创建虚拟环境
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# 安装依赖
+# Install dependencies
 pip install -r requirements.txt
 
-# 安装 Playwright 浏览器
+# Install Playwright browsers
 playwright install chromium
 
-# 启动后端
+# Start backend server
 uvicorn app.main:app --reload --port 8000
 ```
 
-#### 前端
+#### Frontend
 
 ```bash
 cd frontend
 
-# 安装依赖
+# Install dependencies
 npm install
 
-# 启动开发服务器
+# Start development server
 npm run dev
 ```
 
-访问 http://localhost:3000
+Visit http://localhost:3000
 
-## 📖 使用说明
+### One-Click Start
 
-1. 上传 Excel 文件（.xlsx 格式）
-2. 设置表头行数（默认为 1）
-3. 设置每页数据行数（默认为 10）
-4. 选择输出格式（PNG 或 JPG）
-5. 点击"开始生成"
-6. 等待处理完成
-7. 下载 ZIP 文件
-
-## 🏗️ 技术架构
-
-```
-浏览器
-   │
-   ▼
-FastAPI Server
-   │
-   ├── Excel Parser (openpyxl)
-   │       │
-   │       ▼
-   │    HTML Template (Jinja2)
-   │
-   └── Image Worker (Playwright)
-           │
-           ▼
-        PNG/JPG
-           │
-           ▼
-         ZIP
+```bash
+./start-dev.sh
 ```
 
-## 📁 项目结构
+## 📖 Usage
+
+1. Upload Excel file (`.xlsx` format)
+2. Set header rows (default: 1)
+3. Set data rows per page (default: 10)
+4. Select output format (PNG or JPG)
+5. Click "Generate"
+6. Wait for processing to complete
+7. Download ZIP file
+
+### Example
+
+**Input Excel:**
+
+| User Refund Application | | | |
+|---|---|---|---|
+| Date | Applicant | Amount | Reason |
+| 2024-01-15 | John | 100 | Quality issue |
+| 2024-01-16 | Jane | 200 | Wrong item |
+| ... | ... | ... | ... |
+
+**Config:** Header rows = 2, Data rows per page = 1
+
+**Output:**
+```
+001.png  →  Header + John's data
+002.png  →  Header + Jane's data
+003.png  →  Header + Bob's data
+...
+result.zip  →  All images packaged
+```
+
+## 🏗️ Architecture
+
+```
+                    Browser
+                       │
+                       ▼
+               ┌──────────────┐
+               │   FastAPI    │
+               │    Server    │
+               └──────┬───────┘
+                      │
+        ┌─────────────┴─────────────┐
+        │                           │
+        ▼                           ▼
+┌───────────────┐          ┌───────────────┐
+│ Excel Parser  │          │ Image Worker  │
+│   (openpyxl)  │          │ (Playwright)  │
+└───────┬───────┘          └───────┬───────┘
+        │                          │
+        ▼                          ▼
+┌───────────────┐          ┌───────────────┐
+│ HTML Template │          │   Chromium    │
+│   (Jinja2)    │──────────│   Browser     │
+└───────────────┘          └───────┬───────┘
+                                  │
+                                  ▼
+                           ┌───────────────┐
+                           │   PNG/JPG     │
+                           └───────┬───────┘
+                                   │
+                                   ▼
+                           ┌───────────────┐
+                           │      ZIP      │
+                           └───────────────┘
+```
+
+## 📁 Project Structure
 
 ```
 sheetflow/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py           # FastAPI 应用入口
+│   │   ├── main.py              # FastAPI application entry
 │   │   ├── api/
-│   │   │   └── render.py     # API 路由
+│   │   │   └── render.py        # API routes
 │   │   ├── services/
-│   │   │   ├── excel_parser.py   # Excel 解析
-│   │   │   ├── paginator.py      # 分页逻辑
-│   │   │   ├── html_renderer.py  # HTML 渲染
-│   │   │   └── screenshot.py     # 截图服务
+│   │   │   ├── excel_parser.py  # Excel parsing
+│   │   │   ├── paginator.py     # Pagination logic
+│   │   │   ├── html_renderer.py # HTML rendering
+│   │   │   └── screenshot.py    # Screenshot service
 │   │   └── templates/
-│   │       └── table.html    # 表格模板
+│   │       └── table.html       # Table template
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   └── App.vue          # 主应用组件
+│   │   └── App.vue              # Main application component
 │   ├── package.json
 │   ├── nginx.conf
 │   └── Dockerfile
 ├── storage/
-│   ├── uploads/             # 上传的 Excel 文件
-│   ├── jobs/                # 任务状态文件
-│   └── outputs/             # 生成的图片和 ZIP
+│   ├── uploads/                 # Uploaded Excel files
+│   ├── jobs/                    # Job status files
+│   └── outputs/                 # Generated images and ZIP
 ├── docker-compose.yml
+├── start-dev.sh                 # Development startup script
 └── README.md
 ```
 
-## 🔌 API 接口
+## 🔌 API Reference
 
-### 创建渲染任务
+### Create Render Job
 
 ```http
 POST /api/render
 Content-Type: multipart/form-data
+```
 
-Parameters:
-- file: Excel 文件
-- header_rows: 表头行数 (默认: 1)
-- page_size: 每页数据行数 (默认: 10)
-- format: 输出格式 png/jpg (默认: png)
-- quality: JPG 质量 1-100 (可选)
-- sheet_index: Sheet 索引 (默认: 0)
+**Parameters:**
 
-Response:
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| file | File | Yes | - | Excel file (.xlsx) |
+| header_rows | int | No | 1 | Number of header rows |
+| page_size | int | No | 10 | Data rows per page |
+| format | string | No | png | Output format (png/jpg) |
+| quality | int | No | 90 | JPG quality (1-100) |
+| sheet_index | int | No | 0 | Sheet index |
+
+**Response:**
+```json
 {
   "job_id": "abc123",
   "status": "queued",
@@ -151,12 +232,14 @@ Response:
 }
 ```
 
-### 查询任务状态
+### Get Job Status
 
 ```http
 GET /api/job/{job_id}
+```
 
-Response:
+**Response:**
+```json
 {
   "job_id": "abc123",
   "status": "completed",
@@ -166,58 +249,100 @@ Response:
 }
 ```
 
-### 下载结果
+**Status Values:**
+
+| Status | Description |
+|--------|-------------|
+| queued | Waiting to process |
+| parsing | Parsing Excel file |
+| paginating | Processing pagination |
+| rendering | Generating HTML |
+| screenshotting | Capturing screenshots |
+| zipping | Creating ZIP file |
+| completed | Processing complete |
+| error | Processing failed |
+
+### Download Result
 
 ```http
 GET /api/download/{job_id}
-
-Response: ZIP 文件
 ```
 
-## ⚠️ V1 限制
+**Response:** ZIP file download
 
-### 支持
+## ⚠️ V1 Limitations
 
-✅ 普通表格
-✅ 固定表头
-✅ 分页
-✅ 图片生成
-✅ ZIP 下载
-✅ 基础样式保留
+### ✅ Supported
 
-### 暂不支持
+- Standard tables
+- Fixed headers
+- Automatic pagination
+- PNG/JPG image generation
+- ZIP packaging
+- Basic style preservation (fonts, colors, borders)
+- Merged cells
+- Column width adaptation
 
-❌ 复杂公式计算
-❌ 图表
-❌ Excel 图片对象
-❌ 宏文件
-❌ 条件格式
+### ❌ Not Supported Yet
 
-## 📝 开发计划
+- Complex formulas
+- Charts
+- Excel image objects
+- Macro files
+- Conditional formatting
+- Data validation
 
-### V1.0（当前）
-- Excel 解析与分页
-- HTML 模板渲染
-- Playwright 截图
-- ZIP 打包下载
+## 🛠️ Tech Stack
 
-### V2.0
-- PDF 输出
-- 长图模式
-- 自动文件命名
-- Logo/水印
+| Module | Technology | Description |
+|--------|------------|-------------|
+| Backend | FastAPI | High-performance async framework |
+| Excel Parsing | openpyxl | Read xlsx files |
+| HTML Template | Jinja2 | Template rendering |
+| Screenshot | Playwright | Chromium screenshots |
+| Frontend | Vue 3 | Reactive UI |
+| Build Tool | Vite | Fast development |
+| Deployment | Docker | Containerized deployment |
 
-### V3.0
-- 模板保存
-- API 接口
-- 批量任务
-- 企业微信/飞书机器人
+## 📝 Roadmap
 
-## 🤝 贡献
+### V1.0 (Current)
+- [x] Excel parsing and pagination
+- [x] HTML template rendering
+- [x] Playwright screenshots
+- [x] ZIP packaging
+- [x] Web interface
 
-欢迎提交 Issue 和 Pull Request！
+### V2.0 (Planned)
+- [ ] PDF output
+- [ ] Long image mode
+- [ ] Automatic file naming
+- [ ] Logo/Watermark
 
-## 📄 许可证
+### V3.0 (Planned)
+- [ ] Template management
+- [ ] API key authentication
+- [ ] Batch processing
+- [ ] WeChat/Feishu bot integration
 
-MIT License
-# SheetFlow V1 完成
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [openpyxl](https://openpyxl.readthedocs.io/)
+- [Playwright](https://playwright.dev/)
+- [Vue.js](https://vuejs.org/)
+- [Vite](https://vitejs.dev/)
