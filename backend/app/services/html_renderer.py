@@ -157,20 +157,44 @@ def render_page_html(
 
     # Calculate column widths for CSS
     col_widths = []
-    if column_widths and table_rows:
+    if table_rows:
         max_cols = max(len(row) for row in table_rows) if table_rows else 0
-        for i in range(1, max_cols + 1):
-            width = column_widths.get(i)
-            if width:
-                # Excel width to pixels conversion
-                # Excel width is based on character count (default font Calibri 11pt)
-                # 1 character ≈ 7-8 pixels at default size
-                # For Chinese characters, need ~14-16 pixels each
-                # Add padding (16px total) and some buffer
-                # Formula: width * 12 + 16 (padding) gives reasonable results
-                col_widths.append(f"{int(width * 12 + 16)}px")
-            else:
-                col_widths.append("auto")
+
+        # Calculate max content width per column if no Excel widths provided
+        if not column_widths:
+            # Estimate width based on content
+            for col_idx in range(max_cols):
+                max_chars = 0
+                for row in table_rows:
+                    if col_idx < len(row):
+                        cell_value = row[col_idx].get("value", "")
+                        # Count characters (CJK chars count as 2)
+                        char_count = sum(2 if ord(c) > 127 else 1 for c in str(cell_value))
+                        max_chars = max(max_chars, char_count)
+                # Default width: max_chars * 8 + padding
+                default_width = max(max_chars * 8 + 24, 80)  # Min 80px
+                col_widths.append(f"{default_width}px")
+        else:
+            for i in range(1, max_cols + 1):
+                width = column_widths.get(i)
+                if width:
+                    # Excel width to pixels conversion
+                    # Excel width is based on character count (default font Calibri 11pt)
+                    # 1 character ≈ 7-8 pixels at default size
+                    # For Chinese characters, need ~14-16 pixels each
+                    # Add padding (16px total) and some buffer
+                    # Formula: width * 12 + 16 (padding) gives reasonable results
+                    col_widths.append(f"{int(width * 12 + 16)}px")
+                else:
+                    # No width for this column, use content-based estimate
+                    max_chars = 0
+                    for row in table_rows:
+                        if i - 1 < len(row):
+                            cell_value = row[i - 1].get("value", "")
+                            char_count = sum(2 if ord(c) > 127 else 1 for c in str(cell_value))
+                            max_chars = max(max_chars, char_count)
+                    default_width = max(max_chars * 8 + 24, 80)
+                    col_widths.append(f"{default_width}px")
 
     return template.render(
         rows=table_rows,
