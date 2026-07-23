@@ -162,8 +162,13 @@ def render_page_html(
         for i in range(1, max_cols + 1):
             width = column_widths.get(i)
             if width:
-                # Excel width to pixels (approximate)
-                col_widths.append(f"{int(width * 7)}px")
+                # Excel width to pixels conversion
+                # Excel width is based on character count (default font Calibri 11pt)
+                # 1 character ≈ 7-8 pixels at default size
+                # For Chinese characters, need ~14-16 pixels each
+                # Add padding (16px total) and some buffer
+                # Formula: width * 12 + 16 (padding) gives reasonable results
+                col_widths.append(f"{int(width * 12 + 16)}px")
             else:
                 col_widths.append("auto")
 

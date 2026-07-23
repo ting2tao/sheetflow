@@ -39,8 +39,14 @@
             padding: 6px 8px;
             border: 1px solid #000;
             vertical-align: middle;
-            word-wrap: break-word;
-            overflow-wrap: break-word;
+            white-space: nowrap;  /* 防止内容自动换行 */
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 允许有换行符的内容换行 */
+        td:has(br) {
+            white-space: normal;
         }
 
         /* Default styles when no Excel style is applied */
