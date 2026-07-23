@@ -73,6 +73,7 @@ async def _process_single_sheet(
     page_size: int,
     format: str,
     quality: Optional[int],
+    progress_callback=None,
 ) -> tuple[int, List[str]]:
     """Process a single sheet and return (page_count, image_paths)."""
     # Create subdirectory for this sheet
@@ -91,13 +92,14 @@ async def _process_single_sheet(
         html = render_page_html(page, sheet.column_widths)
         html_pages.append(html)
 
-    # Capture screenshots
+    # Capture screenshots with progress callback
     image_paths = await batch_capture(
         html_pages=html_pages,
         output_dir=sheet_dir,
         format=format,
         quality=quality,
         filename_prefix="",
+        progress_callback=progress_callback,
     )
 
     return len(pages), image_paths
@@ -161,12 +163,25 @@ async def _process_render_job(
 
         # Update status: processing
         total_sheets = len(sheets_to_process)
+
+        # Pre-calculate total pages estimate
+        estimated_total_pages = 0
+        for _, sheet in sheets_to_process:
+            if sheet.rows:
+                data_rows = len(sheet.rows) - header_rows
+                if data_rows > 0:
+                    estimated_total_pages += (data_rows + page_size - 1) // page_size
+
         _save_job(job_id, {
             "job_id": job_id,
             "status": "processing",
-            "message": f"正在处理 {total_sheets} 个Sheet...",
+            "message": f"准备处理 {total_sheets} 个Sheet...",
             "total_sheets": total_sheets,
             "sheets_processed": 0,
+            "current_sheet": "",
+            "current_page": 0,
+            "total_pages": estimated_total_pages,
+            "progress": 0,
             "created_at": datetime.now().isoformat(),
         })
 
@@ -175,6 +190,7 @@ async def _process_render_job(
         os.makedirs(output_dir, exist_ok=True)
 
         total_pages = 0
+        pages_processed = 0
         all_image_paths = []
         sheets_info = []
 
@@ -182,34 +198,68 @@ async def _process_render_job(
             if not sheet.rows:
                 continue
 
+            sheet_name = sheet.name
+            sheets_processed = len(sheets_info)
+
+            # Calculate pages for this sheet
+            data_rows = len(sheet.rows) - header_rows
+            sheet_pages = (data_rows + page_size - 1) // page_size if data_rows > 0 else 0
+
             # Update status for current sheet
+            progress = int((pages_processed / max(estimated_total_pages, 1)) * 100)
             _save_job(job_id, {
                 "job_id": job_id,
                 "status": "processing",
-                "message": f"正在处理: {sheet.name} ({len(sheets_info) + 1}/{total_sheets})",
+                "message": f"正在处理: {sheet_name} ({sheets_processed + 1}/{total_sheets})",
                 "total_sheets": total_sheets,
-                "sheets_processed": len(sheets_info),
-                "current_sheet": sheet.name,
+                "sheets_processed": sheets_processed,
+                "current_sheet": sheet_name,
+                "current_page": 0,
+                "sheet_pages": sheet_pages,
+                "total_pages": estimated_total_pages,
+                "pages_processed": pages_processed,
+                "progress": progress,
                 "created_at": datetime.now().isoformat(),
             })
+
+            # Progress callback for this sheet
+            async def sheet_progress_callback(current, total):
+                nonlocal pages_processed
+                current_progress = int(((pages_processed + current) / max(estimated_total_pages, 1)) * 100)
+                _save_job(job_id, {
+                    "job_id": job_id,
+                    "status": "processing",
+                    "message": f"正在处理: {sheet_name} - 第 {current}/{total} 页",
+                    "total_sheets": total_sheets,
+                    "sheets_processed": sheets_processed,
+                    "current_sheet": sheet_name,
+                    "current_page": current,
+                    "sheet_pages": total,
+                    "total_pages": estimated_total_pages,
+                    "pages_processed": pages_processed + current,
+                    "progress": min(current_progress, 99),
+                    "created_at": datetime.now().isoformat(),
+                })
 
             # Process the sheet
             page_count, image_paths = await _process_single_sheet(
                 sheet=sheet,
-                sheet_name=sheet.name,
+                sheet_name=sheet_name,
                 output_dir=output_dir,
                 header_rows=header_rows,
                 page_size=page_size,
                 format=format,
                 quality=quality,
+                progress_callback=sheet_progress_callback,
             )
 
             if page_count > 0:
                 total_pages += page_count
+                pages_processed += page_count
                 all_image_paths.extend(image_paths)
                 sheets_info.append({
                     "index": sheet_idx,
-                    "name": sheet.name,
+                    "name": sheet_name,
                     "pages": page_count,
                     "rows": len(sheet.rows),
                 })

@@ -159,15 +159,32 @@
           </div>
 
           <div class="progress-bar-container" v-if="status !== 'completed' && status !== 'error'">
-            <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
+            <div class="progress-bar" :style="{ width: progressPercent + '%' }">
+              <span class="progress-text" v-if="progressPercent > 10">{{ progressPercent }}%</span>
+            </div>
           </div>
 
-          <div class="job-info" v-if="jobInfo">
+          <div class="progress-details" v-if="status === 'processing' && jobInfo">
+            <div class="detail-item">
+              <span class="detail-label">总体进度</span>
+              <span class="detail-value">{{ jobInfo.pages_processed || 0 }} / {{ jobInfo.total_pages || '?' }} 页</span>
+            </div>
+            <div class="detail-item" v-if="jobInfo.current_sheet">
+              <span class="detail-label">当前Sheet</span>
+              <span class="detail-value">{{ jobInfo.current_sheet }}</span>
+            </div>
+            <div class="detail-item" v-if="jobInfo.current_page">
+              <span class="detail-label">当前进度</span>
+              <span class="detail-value">第 {{ jobInfo.current_page }} / {{ jobInfo.sheet_pages }} 页</span>
+            </div>
+            <div class="detail-item">
+              <span class="detail-label">已完成Sheet</span>
+              <span class="detail-value">{{ jobInfo.sheets_processed || 0 }} / {{ jobInfo.total_sheets || '?' }} 个</span>
+            </div>
+          </div>
+
+          <div class="job-info" v-if="jobInfo && status !== 'processing'">
             <p v-if="jobInfo.total_sheets">处理Sheet数: {{ jobInfo.total_sheets }}</p>
-            <p v-if="jobInfo.sheets_processed !== undefined">
-              已完成: {{ jobInfo.sheets_processed }} / {{ jobInfo.total_sheets }}
-            </p>
-            <p v-if="jobInfo.current_sheet">当前处理: {{ jobInfo.current_sheet }}</p>
             <p v-if="jobInfo.total_pages">总页数: {{ jobInfo.total_pages }}</p>
           </div>
 
@@ -264,11 +281,16 @@ export default {
     })
 
     const progressPercent = computed(() => {
+      // Use detailed progress if available
+      if (jobInfo.value?.progress !== undefined && status.value === 'processing') {
+        return jobInfo.value.progress
+      }
+
       const progressMap = {
-        'queued': 10,
-        'parsing': 20,
+        'queued': 5,
+        'parsing': 10,
         'processing': 50,
-        'zipping': 90,
+        'zipping': 95,
         'completed': 100,
         'error': 100,
       }
@@ -841,7 +863,7 @@ input[type="range"] {
 .progress-bar-container {
   background: #e0e0e0;
   border-radius: 10px;
-  height: 20px;
+  height: 24px;
   margin-bottom: 20px;
   overflow: hidden;
 }
@@ -850,7 +872,48 @@ input[type="range"] {
   height: 100%;
   background: linear-gradient(90deg, #667eea, #764ba2);
   border-radius: 10px;
-  transition: width 0.5s ease;
+  transition: width 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+}
+
+.progress-text {
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.progress-details {
+  background: #f8f9ff;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.detail-item:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.detail-value {
+  color: #333;
+  font-weight: 600;
+  font-size: 0.9rem;
 }
 
 .job-info {

@@ -158,6 +158,7 @@ async def batch_capture(
     quality: Optional[int] = None,
     scale_factor: float = 2.0,
     filename_prefix: str = '',
+    progress_callback=None,
 ) -> list[str]:
     """Capture multiple HTML pages as images.
 
@@ -168,12 +169,14 @@ async def batch_capture(
         quality: JPEG quality
         scale_factor: DPI scale factor
         filename_prefix: Prefix for filenames
+        progress_callback: Optional async callback(current, total) for progress updates
 
     Returns:
         List of saved image paths
     """
     os.makedirs(output_dir, exist_ok=True)
 
+    total = len(html_pages)
     output_paths = []
     for i, html in enumerate(html_pages):
         filename = f"{filename_prefix}{i+1:03d}.{format}"
@@ -183,5 +186,9 @@ async def batch_capture(
             html, output_path, format, quality, scale_factor
         )
         output_paths.append(output_path)
+
+        # Call progress callback if provided
+        if progress_callback:
+            await progress_callback(i + 1, total)
 
     return output_paths
