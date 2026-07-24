@@ -97,6 +97,7 @@ jobs:
           key: ${{ secrets.ALIYUN_SSH_KEY }}
           port: ${{ secrets.ALIYUN_PORT || 22 }}
           envs: IMAGE_TAG,GHCR_USERNAME,GHCR_TOKEN,DEPLOY_PATH,DATA_DIR
+          command_timeout: 30m
           debug: true
           script_stop: true
           script: |
