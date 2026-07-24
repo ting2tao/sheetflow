@@ -18,8 +18,6 @@ os.makedirs(ANALYTICS_DIR, exist_ok=True)
 EXCLUDED_PREFIXES = ("/api/analytics", "/api/health", "/download", "/favicon", "/robots.txt", "/sitemap")
 EXCLUDED_EXTENSIONS = (".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".woff", ".woff2")
 
-DATA_RETENTION_DAYS = 90
-
 
 def _get_analytics_path(date_str: str) -> str:
     return os.path.join(ANALYTICS_DIR, f"{date_str}.json")
@@ -58,19 +56,6 @@ def _classify_agent(user_agent: str) -> str:
         return "desktop"
     return "other"
 
-
-def _cleanup_old_files():
-    """Remove analytics files older than DATA_RETENTION_DAYS."""
-    cutoff = datetime.now() - timedelta(days=DATA_RETENTION_DAYS)
-    for filename in os.listdir(ANALYTICS_DIR):
-        if not filename.endswith(".json"):
-            continue
-        try:
-            file_date = datetime.strptime(filename.replace(".json", ""), "%Y-%m-%d")
-            if file_date < cutoff:
-                os.remove(os.path.join(ANALYTICS_DIR, filename))
-        except ValueError:
-            continue
 
 
 def _normalize_path(path: str) -> str:
@@ -140,9 +125,6 @@ class AnalyticsMiddleware(BaseHTTPMiddleware):
 
             _save_day(date_str, data)
 
-            # Periodic cleanup (1 in 100 chance)
-            if now.minute == 0 and now.second < 10:
-                _cleanup_old_files()
         except Exception:
             pass  # Never break the request for analytics
 

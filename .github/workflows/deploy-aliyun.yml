@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: 'Docker image tag to deploy (e.g. v1.0.0). Leave empty to use latest.'
+        description: 'Docker image tag to deploy (e.g. v1.0.0). Leave empty to use the latest tag.'
         required: false
-        default: 'latest'
+        default: ''
 
 permissions:
   contents: read
@@ -26,6 +26,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Validate deployment secrets
         env:
@@ -55,7 +57,7 @@ jobs:
           IMAGE_TAG="${{ inputs.image_tag }}"
 
           if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG="latest"
+            IMAGE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "main")
           fi
 
           echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
@@ -113,7 +115,7 @@ jobs:
             log "user=$(id -un)"
             log "deploy_path=$DEPLOY_PATH"
             log "data_dir=${DATA_DIR:-/root/sheetflow-data}"
-            log "image_tag=${IMAGE_TAG:-latest}"
+            log "image_tag=${IMAGE_TAG:-main}"
 
             if ! command -v docker >/dev/null 2>&1; then
               fail "docker is not installed on ECS"

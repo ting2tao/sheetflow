@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.render import router as render_router
+from app.api.render import router as render_router, cleanup_storage
 from app.api.analytics import router as analytics_router, AnalyticsMiddleware
 
 app = FastAPI(
@@ -37,6 +37,11 @@ app.add_middleware(AnalyticsMiddleware)
 # Include API routers
 app.include_router(render_router, prefix="/api")
 app.include_router(analytics_router, prefix="/api")
+
+
+@app.on_event("startup")
+def on_startup():
+    cleanup_storage()
 
 
 @app.get("/")

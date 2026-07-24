@@ -76,7 +76,7 @@ git push origin v1.0.0
 1. 进入仓库的 `Actions` 页面
 2. 选择 `Deploy to Aliyun ECS` 工作流
 3. 点击 `Run workflow`
-4. 输入镜像 tag（默认为 `latest`）
+4. 输入镜像 tag（留空则自动使用最新 git tag，无 tag 时回退到 `main`）
 5. 点击 `Run workflow` 按钮
 
 ## 镜像标签说明

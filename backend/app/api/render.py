@@ -10,9 +10,10 @@ import os
 import re
 import uuid
 import json
+import shutil
 import asyncio
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Literal, List
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
@@ -35,6 +36,27 @@ OUTPUTS_DIR = os.path.join(STORAGE_DIR, "outputs")
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(JOBS_DIR, exist_ok=True)
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
+
+# Auto-cleanup: remove files older than 7 days
+RETENTION = timedelta(days=7)
+
+
+def cleanup_storage():
+    """Remove expired uploads, jobs, and outputs on startup."""
+    cutoff = datetime.now() - RETENTION
+    for d in (UPLOADS_DIR, JOBS_DIR, OUTPUTS_DIR):
+        if not os.path.isdir(d):
+            continue
+        for name in os.listdir(d):
+            path = os.path.join(d, name)
+            try:
+                if datetime.fromtimestamp(os.path.getmtime(path)) < cutoff:
+                    if os.path.isdir(path):
+                        shutil.rmtree(path)
+                    else:
+                        os.remove(path)
+            except OSError:
+                pass
 
 
 def _save_job(job_id: str, job_data: dict):
@@ -582,7 +604,6 @@ async def delete_job(job_id: str):
     # Delete output directory
     output_dir = os.path.join(OUTPUTS_DIR, job_id)
     if os.path.exists(output_dir):
-        import shutil
         shutil.rmtree(output_dir)
 
     # Delete ZIP
