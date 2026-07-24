@@ -1,11 +1,9 @@
-FROM python:3.11-slim
+FROM mcr.microsoft.com/playwright/python:v1.52.0-noble
 
 WORKDIR /app
 
-# Install system dependencies for Playwright
+# Install Chinese fonts
 RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
     fonts-wqy-zenhei \
     fonts-wqy-microhei \
     fonts-unifont \
@@ -15,10 +13,6 @@ RUN apt-get update && apt-get install -y \
 # Copy requirements first for caching
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Install Playwright browsers
-RUN playwright install chromium
-RUN playwright install-deps chromium || true
 
 # Copy application code
 COPY . .
