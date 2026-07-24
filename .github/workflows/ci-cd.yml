@@ -153,7 +153,11 @@ jobs:
           IMAGE_TAG="${{ inputs.image_tag }}"
 
           if [ -z "$IMAGE_TAG" ]; then
-            IMAGE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "main")
+            if [ "${{ github.ref_type }}" = "tag" ]; then
+              IMAGE_TAG="${{ github.ref_name }}"
+            else
+              IMAGE_TAG="main"
+            fi
           fi
 
           echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
