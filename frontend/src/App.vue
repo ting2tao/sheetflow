@@ -356,6 +356,14 @@ export default {
         jobId.value = data.job_id
         sheets.value = data.sheets || []
 
+        // Track upload event
+        if (typeof gtag === 'function') {
+          gtag('event', 'file_upload', {
+            file_size: file.value.size,
+            sheet_count: data.sheets?.length || 0,
+          })
+        }
+
         // Auto select first sheet
         if (sheets.value.length > 0) {
           selectedSheets.value = [sheets.value[0].index]
@@ -414,6 +422,14 @@ export default {
         status.value = data.status
         statusMessage.value = data.message
 
+        // Track render event
+        if (typeof gtag === 'function') {
+          gtag('event', 'render_start', {
+            sheet_count: selectedSheets.value.length,
+            format: format.value,
+          })
+        }
+
         // Move to step 3
         step.value = 3
 
@@ -448,6 +464,9 @@ export default {
 
     const downloadResult = () => {
       if (jobId.value) {
+        if (typeof gtag === 'function') {
+          gtag('event', 'file_download', { job_id: jobId.value })
+        }
         window.location.href = `/api/download/${jobId.value}`
       }
     }
@@ -473,6 +492,19 @@ export default {
     onUnmounted(() => {
       if (pollTimer) {
         clearInterval(pollTimer)
+      }
+    })
+
+    // GA4 page tracking for SPA
+    const pageNames = { 1: 'upload', 2: 'settings', 3: 'progress' }
+    watch(step, (newStep) => {
+      const pageName = pageNames[newStep] || 'unknown'
+      if (typeof gtag === 'function') {
+        gtag('event', 'page_view', {
+          page_title: `SheetFlow - ${pageName}`,
+          page_location: window.location.href,
+          page_path: `/#${pageName}`,
+        })
       }
     })
 

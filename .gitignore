@@ -26,17 +26,21 @@ yarn-error.log*
 storage/uploads/*
 storage/jobs/*
 storage/outputs/*
+storage/analytics/*
 !storage/uploads/.gitkeep
 !storage/jobs/.gitkeep
 !storage/outputs/.gitkeep
+!storage/analytics/.gitkeep
 
 # Backend storage (runtime data)
 backend/storage/uploads/*
 backend/storage/jobs/*
 backend/storage/outputs/*
+backend/storage/analytics/*
 !backend/storage/uploads/.gitkeep
 !backend/storage/jobs/.gitkeep
 !backend/storage/outputs/.gitkeep
+!backend/storage/analytics/.gitkeep
 
 # OS
 .DS_Store

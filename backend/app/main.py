@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.render import router as render_router
+from app.api.analytics import router as analytics_router, AnalyticsMiddleware
 
 app = FastAPI(
     title="SheetFlow",
@@ -25,12 +26,17 @@ STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__fil
 os.makedirs(os.path.join(STORAGE_DIR, "uploads"), exist_ok=True)
 os.makedirs(os.path.join(STORAGE_DIR, "jobs"), exist_ok=True)
 os.makedirs(os.path.join(STORAGE_DIR, "outputs"), exist_ok=True)
+os.makedirs(os.path.join(STORAGE_DIR, "analytics"), exist_ok=True)
 
 # Mount storage for downloads
 app.mount("/download", StaticFiles(directory=os.path.join(STORAGE_DIR, "outputs")), name="download")
 
-# Include API router
+# Analytics middleware
+app.add_middleware(AnalyticsMiddleware)
+
+# Include API routers
 app.include_router(render_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
 
 
 @app.get("/")
