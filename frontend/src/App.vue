@@ -1,14 +1,15 @@
 <template>
   <div class="app">
+    <LanguageSwitcher />
     <header class="header">
       <h1>📊 SheetFlow</h1>
-      <p class="subtitle">表格分页图片生成器</p>
+      <p class="subtitle">{{ t('app.subtitle') }}</p>
     </header>
 
     <main class="main">
       <!-- Step 1: Upload Section -->
       <section class="card upload-section" v-if="step === 1">
-        <h2>📁 上传Excel文件</h2>
+        <h2>{{ t('upload.title') }}</h2>
         <div
           class="drop-zone"
           :class="{ 'drag-over': isDragOver, 'has-file': file }"
@@ -19,8 +20,8 @@
         >
           <div v-if="!file" class="drop-content">
             <span class="drop-icon">📄</span>
-            <p>拖拽文件到此处，或点击选择</p>
-            <p class="drop-hint">支持 .xlsx 格式</p>
+            <p>{{ t('upload.drop') }}</p>
+            <p class="drop-hint">{{ t('upload.hint') }}</p>
           </div>
           <div v-else class="file-info">
             <span class="file-icon">✅</span>
@@ -44,13 +45,13 @@
           @click="uploadFile"
           :disabled="isUploading"
         >
-          {{ isUploading ? '上传中...' : '📤 上传并解析' }}
+          {{ isUploading ? t('upload.uploading') : t('upload.submit') }}
         </button>
       </section>
 
       <!-- Step 2: Sheet Selection & Settings -->
       <section class="card settings-section" v-if="step === 2">
-        <h2>📋 选择Sheet</h2>
+        <h2>{{ t('settings.sheetsTitle') }}</h2>
 
         <div class="sheets-list">
           <div class="select-all">
@@ -60,7 +61,7 @@
                 :checked="allSelected"
                 @change="toggleAllSheets"
               >
-              <span>全选</span>
+              <span>{{ t('settings.selectAll') }}</span>
             </label>
           </div>
 
@@ -78,16 +79,18 @@
               >
               <div class="sheet-info">
                 <span class="sheet-name">{{ sheet.name }}</span>
-                <span class="sheet-meta">{{ sheet.rows }} 行 × {{ sheet.columns }} 列</span>
+                <span class="sheet-meta">
+                  {{ t('settings.sheetMeta', { rows: sheet.rows, columns: sheet.columns }) }}
+                </span>
               </div>
             </label>
           </div>
         </div>
 
-        <h2>⚙️ 分页设置</h2>
+        <h2>{{ t('settings.title') }}</h2>
         <div class="settings-grid">
           <div class="setting-item">
-            <label>表头行数</label>
+            <label>{{ t('settings.headerRows') }}</label>
             <input
               v-model.number="headerRows"
               type="number"
@@ -95,10 +98,10 @@
               max="100"
               placeholder="1"
             >
-            <span class="setting-hint">Excel中固定的表头行数</span>
+            <span class="setting-hint">{{ t('settings.headerRowsHint') }}</span>
           </div>
           <div class="setting-item">
-            <label>每页数据行</label>
+            <label>{{ t('settings.pageSize') }}</label>
             <input
               v-model.number="pageSize"
               type="number"
@@ -106,25 +109,25 @@
               max="1000"
               placeholder="10"
             >
-            <span class="setting-hint">每张图片包含的数据行数</span>
+            <span class="setting-hint">{{ t('settings.pageSizeHint') }}</span>
           </div>
           <div class="setting-item">
-            <label>图片格式</label>
+            <label>{{ t('settings.format') }}</label>
             <div class="format-selector">
               <label class="format-option">
                 <input type="radio" v-model="format" value="png">
                 <span>PNG</span>
-                <small>无损压缩，质量最好</small>
+                <small>{{ t('settings.pngHint') }}</small>
               </label>
               <label class="format-option">
                 <input type="radio" v-model="format" value="jpg">
                 <span>JPG</span>
-                <small>有损压缩，文件更小</small>
+                <small>{{ t('settings.jpgHint') }}</small>
               </label>
             </div>
           </div>
           <div class="setting-item" v-if="format === 'jpg'">
-            <label>图片质量</label>
+            <label>{{ t('settings.quality') }}</label>
             <input
               v-model.number="quality"
               type="range"
@@ -137,21 +140,25 @@
 
         <div class="action-buttons">
           <button class="btn-secondary" @click="goBack">
-            ← 返回
+            {{ t('settings.back') }}
           </button>
           <button
             class="btn-primary"
             @click="startRender"
             :disabled="selectedSheets.length === 0 || isProcessing"
           >
-            {{ isProcessing ? '处理中...' : `🚀 开始生成 (${selectedSheets.length}个Sheet)` }}
+            {{
+              isProcessing
+                ? t('settings.processing')
+                : t('settings.start', { count: selectedSheets.length })
+            }}
           </button>
         </div>
       </section>
 
       <!-- Step 3: Progress Section -->
       <section class="card progress-section" v-if="step === 3">
-        <h2>⏳ 任务进度</h2>
+        <h2>{{ t('progress.title') }}</h2>
         <div class="progress-content">
           <div class="progress-status">
             <span class="status-icon" :class="statusClass">{{ statusIcon }}</span>
@@ -166,34 +173,63 @@
 
           <div class="progress-details" v-if="status === 'processing' && jobInfo">
             <div class="detail-item">
-              <span class="detail-label">总体进度</span>
-              <span class="detail-value">{{ jobInfo.pages_processed || 0 }} / {{ jobInfo.total_pages || '?' }} 页</span>
+              <span class="detail-label">{{ t('progress.overall') }}</span>
+              <span class="detail-value">
+                {{
+                  t('progress.pagePosition', {
+                    current: jobInfo.pages_processed || 0,
+                    total: jobInfo.total_pages || '?',
+                  })
+                }}
+              </span>
             </div>
             <div class="detail-item" v-if="jobInfo.current_sheet">
-              <span class="detail-label">当前Sheet</span>
+              <span class="detail-label">{{ t('progress.currentSheet') }}</span>
               <span class="detail-value">{{ jobInfo.current_sheet }}</span>
             </div>
             <div class="detail-item" v-if="jobInfo.current_page">
-              <span class="detail-label">当前进度</span>
-              <span class="detail-value">第 {{ jobInfo.current_page }} / {{ jobInfo.sheet_pages }} 页</span>
+              <span class="detail-label">{{ t('progress.current') }}</span>
+              <span class="detail-value">
+                {{
+                  t('progress.pagePosition', {
+                    current: jobInfo.current_page,
+                    total: jobInfo.sheet_pages,
+                  })
+                }}
+              </span>
             </div>
             <div class="detail-item">
-              <span class="detail-label">已完成Sheet</span>
-              <span class="detail-value">{{ jobInfo.sheets_processed || 0 }} / {{ jobInfo.total_sheets || '?' }} 个</span>
+              <span class="detail-label">{{ t('progress.completedSheets') }}</span>
+              <span class="detail-value">
+                {{ jobInfo.sheets_processed || 0 }} /
+                {{
+                  t(
+                    'progress.sheetCount',
+                    { count: jobInfo.total_sheets || '?' },
+                    jobInfo.total_sheets || 0,
+                  )
+                }}
+              </span>
             </div>
           </div>
 
           <div class="job-info" v-if="jobInfo && status !== 'processing'">
-            <p v-if="jobInfo.total_sheets">处理Sheet数: {{ jobInfo.total_sheets }}</p>
-            <p v-if="jobInfo.total_pages">总页数: {{ jobInfo.total_pages }}</p>
+            <p v-if="jobInfo.total_sheets">
+              {{ t('progress.processedSheetCount', { count: jobInfo.total_sheets }) }}
+            </p>
+            <p v-if="jobInfo.total_pages">
+              {{ t('progress.totalPages', { count: jobInfo.total_pages }) }}
+            </p>
           </div>
 
           <!-- Completed sheets info -->
           <div v-if="status === 'completed' && jobInfo?.sheets" class="completed-sheets">
-            <h3>✅ 处理完成</h3>
+            <h3>{{ t('progress.completed') }}</h3>
             <div v-for="sheet in jobInfo.sheets" :key="sheet.index" class="completed-sheet">
               <span class="sheet-name">{{ sheet.name }}</span>
-              <span class="sheet-pages">{{ sheet.pages }} 页</span>
+              <span class="sheet-pages">
+                {{ t('progress.pageCount', { count: sheet.pages }, sheet.pages) }}
+              </span>
             </div>
           </div>
 
@@ -203,13 +239,13 @@
               class="btn-primary"
               @click="downloadResult"
             >
-              📥 下载ZIP
+              {{ t('progress.download') }}
             </button>
             <button
               class="btn-secondary"
               @click="resetForm"
             >
-              🔄 重新开始
+              {{ t('progress.restart') }}
             </button>
           </div>
         </div>
@@ -217,17 +253,31 @@
     </main>
 
     <footer class="footer">
-      <p>SheetFlow V1.0 - 表格分页图片生成器</p>
+      <p>{{ t('app.footer') }}</p>
     </footer>
   </div>
 </template>
 
 <script>
 import { ref, computed, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import { localizeApiError, localizeJobMessage } from './i18n/api-message'
+import { observeLocaleChanges } from './i18n/locale'
 
 export default {
   name: 'App',
+  components: {
+    LanguageSwitcher,
+  },
   setup() {
+    const { t, locale } = useI18n()
+    document.documentElement.lang = locale.value
+    const stopObservingLocale = observeLocaleChanges((nextLocale) => {
+      locale.value = nextLocale
+      document.documentElement.lang = nextLocale
+    })
+
     // Step management
     const step = ref(1)  // 1: upload, 2: settings, 3: progress
 
@@ -250,7 +300,7 @@ export default {
 
     // Progress
     const status = ref('')
-    const statusMessage = ref('')
+    const statusPayload = ref(null)
     const jobInfo = ref(null)
     const isProcessing = ref(false)
     let pollTimer = null
@@ -297,6 +347,11 @@ export default {
       return progressMap[status.value] || 0
     })
 
+    const statusMessage = computed(() => {
+      locale.value
+      return statusPayload.value ? localizeJobMessage(statusPayload.value, t) : ''
+    })
+
     // Methods
     const triggerFileInput = () => {
       fileInput.value?.click()
@@ -307,7 +362,7 @@ export default {
       if (selectedFile && selectedFile.name.endsWith('.xlsx')) {
         file.value = selectedFile
       } else {
-        alert('请选择 .xlsx 格式的Excel文件')
+        alert(t('errors.invalidSelection'))
       }
     }
 
@@ -317,7 +372,7 @@ export default {
       if (droppedFile && droppedFile.name.endsWith('.xlsx')) {
         file.value = droppedFile
       } else {
-        alert('仅支持 .xlsx 格式的Excel文件')
+        alert(t('errors.invalidSelection'))
       }
     }
 
@@ -348,8 +403,8 @@ export default {
         })
 
         if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.detail || '上传失败')
+          const payload = await response.json().catch(() => ({}))
+          throw new Error(localizeApiError(payload, t))
         }
 
         const data = await response.json()
@@ -357,12 +412,11 @@ export default {
         sheets.value = data.sheets || []
 
         // Track upload event
-        if (typeof gtag === 'function') {
-          gtag('event', 'file_upload', {
-            file_size: file.value.size,
-            sheet_count: data.sheets?.length || 0,
-          })
-        }
+        window.gtag?.('event', 'file_upload', {
+          file_size: file.value.size,
+          sheet_count: data.sheets?.length || 0,
+          language: locale.value,
+        })
 
         // Auto select first sheet
         if (sheets.value.length > 0) {
@@ -372,7 +426,7 @@ export default {
         // Move to step 2
         step.value = 2
       } catch (error) {
-        alert('错误: ' + error.message)
+        alert(t('errors.prefix', { message: error.message }))
       } finally {
         isUploading.value = false
       }
@@ -414,21 +468,20 @@ export default {
         })
 
         if (!response.ok) {
-          const error = await response.json()
-          throw new Error(error.detail || '请求失败')
+          const payload = await response.json().catch(() => ({}))
+          throw new Error(localizeApiError(payload, t))
         }
 
         const data = await response.json()
         status.value = data.status
-        statusMessage.value = data.message
+        statusPayload.value = data
 
         // Track render event
-        if (typeof gtag === 'function') {
-          gtag('event', 'render_start', {
-            sheet_count: selectedSheets.value.length,
-            format: format.value,
-          })
-        }
+        window.gtag?.('event', 'render_start', {
+          sheet_count: selectedSheets.value.length,
+          format: format.value,
+          language: locale.value,
+        })
 
         // Move to step 3
         step.value = 3
@@ -436,7 +489,7 @@ export default {
         // Start polling for status
         startPolling()
       } catch (error) {
-        alert('错误: ' + error.message)
+        alert(t('errors.prefix', { message: error.message }))
         isProcessing.value = false
       }
     }
@@ -445,11 +498,14 @@ export default {
       pollTimer = setInterval(async () => {
         try {
           const response = await fetch(`/api/job/${jobId.value}`)
-          if (!response.ok) throw new Error('查询失败')
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}))
+            throw new Error(localizeApiError(payload, t))
+          }
 
           const data = await response.json()
           status.value = data.status
-          statusMessage.value = data.message
+          statusPayload.value = data
           jobInfo.value = data
 
           if (data.status === 'completed' || data.status === 'error') {
@@ -457,16 +513,17 @@ export default {
             isProcessing.value = false
           }
         } catch (error) {
-          console.error('Poll error:', error)
+          console.error(t('errors.polling'), error)
         }
       }, 1000)
     }
 
     const downloadResult = () => {
       if (jobId.value) {
-        if (typeof gtag === 'function') {
-          gtag('event', 'file_download', { job_id: jobId.value })
-        }
+        window.gtag?.('event', 'file_download', {
+          job_id: jobId.value,
+          language: locale.value,
+        })
         window.location.href = `/api/download/${jobId.value}`
       }
     }
@@ -478,7 +535,7 @@ export default {
       sheets.value = []
       selectedSheets.value = []
       status.value = ''
-      statusMessage.value = ''
+      statusPayload.value = null
       jobInfo.value = null
       isProcessing.value = false
       if (fileInput.value) {
@@ -493,19 +550,19 @@ export default {
       if (pollTimer) {
         clearInterval(pollTimer)
       }
+      stopObservingLocale()
     })
 
     // GA4 page tracking for SPA
     const pageNames = { 1: 'upload', 2: 'settings', 3: 'progress' }
     watch(step, (newStep) => {
       const pageName = pageNames[newStep] || 'unknown'
-      if (typeof gtag === 'function') {
-        gtag('event', 'page_view', {
-          page_title: `SheetFlow - ${pageName}`,
-          page_location: window.location.href,
-          page_path: `/#${pageName}`,
-        })
-      }
+      window.gtag?.('event', 'page_view', {
+        page_title: `SheetFlow - ${pageName}`,
+        page_location: window.location.href,
+        page_path: `${window.location.pathname}#${pageName}`,
+        language: locale.value,
+      })
     })
 
     return {
@@ -529,6 +586,7 @@ export default {
       statusClass,
       statusIcon,
       progressPercent,
+      t,
       triggerFileInput,
       handleFileSelect,
       handleDrop,
@@ -561,6 +619,7 @@ body {
 }
 
 .app {
+  position: relative;
   max-width: 800px;
   margin: 0 auto;
   padding: 20px;
