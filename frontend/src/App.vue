@@ -252,6 +252,8 @@
       </section>
     </main>
 
+    <SeoContent />
+
     <footer class="footer">
       <p>{{ t('app.footer') }}</p>
     </footer>
@@ -262,20 +264,23 @@
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import SeoContent from './components/SeoContent.vue'
 import { localizeApiError, localizeJobMessage } from './i18n/api-message'
 import { observeLocaleChanges } from './i18n/locale'
+import { applyLocalizedSeo } from './i18n/seo'
 
 export default {
   name: 'App',
   components: {
     LanguageSwitcher,
+    SeoContent,
   },
   setup() {
     const { t, locale } = useI18n()
-    document.documentElement.lang = locale.value
+    applyLocalizedSeo(locale.value)
     const stopObservingLocale = observeLocaleChanges((nextLocale) => {
       locale.value = nextLocale
-      document.documentElement.lang = nextLocale
+      applyLocalizedSeo(nextLocale)
     })
 
     // Step management

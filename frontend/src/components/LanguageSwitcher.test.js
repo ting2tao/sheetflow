@@ -3,7 +3,9 @@ import { createI18n } from 'vue-i18n'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from '../App.vue'
 import LanguageSwitcher from './LanguageSwitcher.vue'
+import SeoContent from './SeoContent.vue'
 import { messages } from '../i18n/messages'
+import { SEO_METADATA, applyLocalizedSeo } from '../i18n/seo'
 
 function mountSwitcher(locale = 'zh-CN') {
   const i18n = createI18n({
@@ -45,6 +47,7 @@ describe('LanguageSwitcher', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/zh/')
     window.gtag = vi.fn()
+    document.head.innerHTML = '<title>SheetFlow</title>'
     document.documentElement.lang = 'zh-CN'
   })
 
@@ -89,6 +92,26 @@ describe('LanguageSwitcher', () => {
     expect(window.location.pathname).toBe('/en/')
     expect(document.documentElement.lang).toBe('en-US')
   })
+
+  it('updates localized head metadata after a successful language choice', async () => {
+    applyLocalizedSeo('zh-CN', { origin: window.location.origin })
+    const { wrapper } = mountSwitcher()
+
+    await wrapper.get('[data-locale="en-US"]').trigger('click')
+
+    expect(document.title).toBe(SEO_METADATA['en-US'].title)
+    expect(
+      document.head.querySelector('meta[name="description"]').content,
+    ).toBe(SEO_METADATA['en-US'].description)
+    expect(
+      document.head.querySelector('link[rel="canonical"]').href,
+    ).toBe(`${window.location.origin}/en/`)
+    expect(
+      JSON.parse(
+        document.head.querySelector('script[type="application/ld+json"]').textContent,
+      ).inLanguage,
+    ).toBe('en-US')
+  })
 })
 
 describe('App language integration', () => {
@@ -97,6 +120,7 @@ describe('App language integration', () => {
   beforeEach(() => {
     wrappers = []
     window.gtag = vi.fn()
+    document.head.innerHTML = '<title>SheetFlow</title>'
   })
 
   afterEach(() => {
@@ -219,6 +243,68 @@ describe('App language integration', () => {
 
     expect(i18n.global.locale.value).toBe('en-US')
     expect(document.documentElement.lang).toBe('en-US')
+    expect(document.title).toBe(SEO_METADATA['en-US'].title)
+    expect(
+      document.head.querySelector('link[rel="canonical"]').href,
+    ).toBe(`${window.location.origin}/en/`)
     expect(wrapper.get('.upload-section h2').text()).toBe('📁 Upload an Excel File')
+  })
+
+  it.each([
+    {
+      locale: 'zh-CN',
+      path: '/zh/',
+      heading: 'SheetFlow 是什么？',
+      feature: 'Excel 转图片',
+      faq: '支持哪些 Excel 格式？',
+    },
+    {
+      locale: 'en-US',
+      path: '/en/',
+      heading: 'What is SheetFlow?',
+      feature: 'Excel to image',
+      faq: 'Which Excel formats are supported?',
+    },
+  ])('renders delayed $locale SEO content inside App', async ({
+    locale,
+    path,
+    heading,
+    feature,
+    faq,
+  }) => {
+    vi.useFakeTimers()
+    window.history.replaceState(null, '', path)
+    const { wrapper } = trackedApp(locale)
+
+    expect(wrapper.find('.seo-content').exists()).toBe(false)
+    vi.advanceTimersByTime(100)
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.get('.seo-content h2').text()).toContain(heading)
+    expect(wrapper.get('.seo-content ul li strong').text()).toBe(feature)
+    expect(wrapper.get('.seo-content .faq-item h3').text()).toBe(faq)
+  })
+
+  it('keeps the mounted SEO content instance while switching its language', async () => {
+    vi.useFakeTimers()
+    window.history.replaceState(null, '', '/zh/')
+    const { wrapper } = trackedApp()
+
+    vi.advanceTimersByTime(100)
+    await wrapper.vm.$nextTick()
+    const seoContent = wrapper.getComponent(SeoContent)
+    const seoContentElement = seoContent.get('.seo-content').element
+    expect(seoContent.get('.seo-content h2').text()).toContain('SheetFlow 是什么？')
+
+    await wrapper.get('[data-locale="en-US"]').trigger('click')
+
+    expect(wrapper.getComponent(SeoContent).get('.seo-content').element).toBe(
+      seoContentElement,
+    )
+    expect(seoContent.get('.seo-content h2').text()).toContain('What is SheetFlow?')
+    expect(seoContent.get('.seo-content ul li strong').text()).toBe('Excel to image')
+    expect(seoContent.get('.seo-content .faq-item h3').text()).toBe(
+      'Which Excel formats are supported?',
+    )
   })
 })

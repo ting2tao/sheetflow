@@ -17,6 +17,7 @@
 <script>
 import { useI18n } from 'vue-i18n'
 import { switchLocale } from '../i18n/locale'
+import { applyLocalizedSeo } from '../i18n/seo'
 
 export default {
   name: 'LanguageSwitcher',
@@ -33,7 +34,7 @@ export default {
       const previousLocale = locale.value
       switchLocale(nextLocale)
       locale.value = nextLocale
-      document.documentElement.lang = nextLocale
+      applyLocalizedSeo(nextLocale)
       if (typeof window.gtag === 'function') {
         window.gtag('event', 'language_change', {
           from_language: previousLocale,
