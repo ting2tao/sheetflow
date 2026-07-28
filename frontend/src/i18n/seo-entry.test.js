@@ -306,5 +306,9 @@ describe('SEO build configuration', () => {
     expect(workflow).toContain('case "$VITE_PUBLIC_SITE_URL" in')
     expect(workflow).toContain('https://*)')
     expect(workflow).toContain('build-args: |')
+    expect(workflow).toContain(
+      "description: 'Docker image tag to deploy (for example v1.0.0). Leave empty to use the triggering tag, or main for a branch/manual run.'",
+    )
+    expect(workflow).not.toContain('use the latest tag')
   })
 })

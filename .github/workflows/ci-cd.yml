@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: 'Docker image tag to deploy (e.g. v1.0.0). Leave empty to use the latest tag.'
+        description: 'Docker image tag to deploy (for example v1.0.0). Leave empty to use the triggering tag, or main for a branch/manual run.'
         required: false
         default: ''
 
