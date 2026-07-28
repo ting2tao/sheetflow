@@ -22,11 +22,26 @@ describe('localizeJobMessage', () => {
     }, translator('zh-CN'))).toBe('正在处理：Orders - 第 2/5 页')
   })
 
-  it('selects the English completed plural form', () => {
+  it.each([
+    [1, 1, 'Complete! Processed 1 sheet and generated 1 image'],
+    [1, 2, 'Complete! Processed 1 sheet and generated 2 images'],
+    [2, 1, 'Complete! Processed 2 sheets and generated 1 image'],
+    [2, 2, 'Complete! Processed 2 sheets and generated 2 images'],
+  ])('formats an English completion for %i sheets and %i pages', (sheets, pages, expected) => {
     expect(localizeJobMessage({
       message_code: 'completed',
-      message_params: { sheets: 1, pages: 2 },
-    }, translator())).toBe('Complete! Processed 1 sheet and generated 2 images')
+      message_params: { sheets, pages },
+    }, translator())).toBe(expected)
+  })
+
+  it.each([
+    [1, 'Preparing to process 1 sheet...'],
+    [2, 'Preparing to process 2 sheets...'],
+  ])('pluralizes an English preparation for %i sheets', (sheets, expected) => {
+    expect(localizeJobMessage({
+      message_code: 'preparing',
+      message_params: { sheets },
+    }, translator())).toBe(expected)
   })
 
   it('returns a legacy message when no message code is supplied', () => {
@@ -62,6 +77,11 @@ describe('localizeApiError', () => {
 })
 
 describe('message catalog contracts', () => {
+  it('pluralizes the generate action from a named count', () => {
+    expect(translator()('settings.start', { count: 1 })).toBe('🚀 Generate (1 sheet)')
+    expect(translator()('settings.start', { count: 2 })).toBe('🚀 Generate (2 sheets)')
+  })
+
   it('interpolates and pluralizes page counts', () => {
     expect(translator('zh-CN')('progress.pageCount', { count: 2 })).toBe('2 页')
     expect(translator()('progress.pageCount', { count: 1 }, 1)).toBe('1 page')
