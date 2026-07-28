@@ -84,7 +84,7 @@ describe('localized SEO entry points', () => {
   test('keeps the root entry neutral and out of search indexes', async () => {
     const html = await readFrontendFile('index.html')
 
-    expect(html).toContain('<html lang="en">')
+    expect(html).toContain('<html lang="zh-CN">')
     expect(html).toContain('<title>SheetFlow</title>')
     expect(html).toContain('<meta name="robots" content="noindex, follow">')
     expect(html).toContain('<div id="app"></div>')
@@ -113,6 +113,7 @@ describe('localized SEO entry points', () => {
   test('keeps protected paths out of robots and uses the public URL token', async () => {
     const robots = await readFrontendFile('public/robots.txt')
 
+    // API and download output must remain excluded from crawler discovery.
     expect(robots).toContain('Disallow: /api/')
     expect(robots).toContain('Disallow: /download/')
     expect(robots).toContain(
@@ -212,9 +213,19 @@ describe('SEO build configuration', () => {
     )
     expect(main).toContain('.use(i18n).mount')
     expect(nginx).toMatch(/location = \/ \{[\s\S]*try_files \/index\.html =404;/)
-    expect(nginx).toMatch(/location \^~ \/zh\/ \{[\s\S]*\/zh\/index\.html;/)
-    expect(nginx).toMatch(/location \^~ \/en\/ \{[\s\S]*\/en\/index\.html;/)
+    expect(nginx).toContain('location /api/ {')
+    expect(nginx).not.toContain('location ^~ /api/ {')
+    expect(nginx).toContain('location /download/ {')
+    expect(nginx).not.toContain('location ^~ /download/ {')
+    expect(nginx).toMatch(/location \/zh\/ \{[\s\S]*\/zh\/index\.html;/)
+    expect(nginx).toMatch(/location \/en\/ \{[\s\S]*\/en\/index\.html;/)
+    expect(nginx).not.toContain('location ^~ /zh/ {')
+    expect(nginx).not.toContain('location ^~ /en/ {')
     expect(nginx).toContain('return 302 /zh/;')
+    expect(nginx).not.toContain('@localized_redirect')
+    expect(nginx).toMatch(
+      /location ~\* \\\.\(js\|css\|png\|jpg\|jpeg\|gif\|ico\|svg\)\$ \{\s+expires 1y;\s+add_header Cache-Control "public, immutable";\s+\}/,
+    )
     expect(packageJson).toContain(
       '"build": "vite build && node scripts/write-seo-files.mjs"',
     )
