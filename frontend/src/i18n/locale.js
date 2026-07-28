@@ -14,11 +14,12 @@ function isSupportedLocale(locale) {
 }
 
 function browserLanguages() {
-  return typeof navigator === 'undefined' ? [] : navigator.languages || []
+  if (typeof navigator === 'undefined') return []
+  return navigator.languages?.length ? navigator.languages : [navigator.language]
 }
 
 function browserLocale(languages) {
-  const language = languages.find(Boolean)
+  const language = Array.from(languages || []).find(Boolean)
 
   if (!language) return DEFAULT_LOCALE
   return language.toLowerCase().startsWith('zh') ? ZH_LOCALE : EN_LOCALE
@@ -75,7 +76,20 @@ export function switchLocale(locale) {
     // A blocked storage area must not prevent a locale switch.
   }
 
-  const path = localizedPath(locale)
+  const path = `${localizedPath(locale)}${window.location.search}${window.location.hash}`
   window.history.pushState(window.history.state, '', path)
   window.dispatchEvent(new CustomEvent('sheetflow:locale-change', { detail: locale }))
+}
+
+export function observeLocaleChanges(callback) {
+  const handlePopState = () => {
+    const locale = localeFromPath(window.location.pathname)
+    if (!locale) return
+
+    callback(locale)
+    window.dispatchEvent(new CustomEvent('sheetflow:locale-change', { detail: locale }))
+  }
+
+  window.addEventListener('popstate', handlePopState)
+  return () => window.removeEventListener('popstate', handlePopState)
 }

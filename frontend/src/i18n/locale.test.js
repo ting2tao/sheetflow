@@ -6,6 +6,7 @@ import {
   ZH_LOCALE,
   localeFromPath,
   localizedPath,
+  observeLocaleChanges,
   resolveInitialLocale,
   switchLocale,
 } from './locale'
@@ -14,6 +15,13 @@ function setBrowserLanguages(languages) {
   Object.defineProperty(window.navigator, 'languages', {
     configurable: true,
     value: languages,
+  })
+}
+
+function setBrowserLanguage(language) {
+  Object.defineProperty(window.navigator, 'language', {
+    configurable: true,
+    value: language,
   })
 }
 
@@ -33,6 +41,7 @@ describe('resolveInitialLocale', () => {
   beforeEach(() => {
     window.localStorage.clear()
     setBrowserLanguages([])
+    setBrowserLanguage('')
   })
 
   afterEach(() => {
@@ -73,6 +82,17 @@ describe('resolveInitialLocale', () => {
     }
 
     expect(resolveInitialLocale({ pathname: '/', storage, languages: ['en-GB'] })).toBe(EN_LOCALE)
+  })
+
+  it.each([
+    [undefined, 'zh-TW', ZH_LOCALE],
+    [[], 'en-GB', EN_LOCALE],
+    [[], '', DEFAULT_LOCALE],
+  ])('falls back from browser languages %j to navigator.language %s', (languages, language, locale) => {
+    setBrowserLanguages(languages)
+    setBrowserLanguage(language)
+
+    expect(resolveInitialLocale({ pathname: '/' })).toBe(locale)
   })
 })
 
@@ -120,5 +140,55 @@ describe('switchLocale', () => {
 
     expect(() => switchLocale(EN_LOCALE)).not.toThrow()
     expect(window.location.pathname).toBe('/en/')
+  })
+
+  it('preserves the current query string and hash', () => {
+    window.history.replaceState({ source: 'test' }, '', '/zh/features?utm_source=newsletter#pricing')
+    const pushState = vi.spyOn(window.history, 'pushState')
+
+    switchLocale(EN_LOCALE)
+
+    expect(pushState).toHaveBeenCalledWith(
+      { source: 'test' },
+      '',
+      '/en/features/?utm_source=newsletter#pricing',
+    )
+  })
+})
+
+describe('observeLocaleChanges', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/zh/')
+  })
+
+  it('syncs supported locales after navigation and can be detached', () => {
+    const callback = vi.fn()
+    const eventListener = vi.fn()
+    window.addEventListener('sheetflow:locale-change', eventListener)
+    const stopObserving = observeLocaleChanges(callback)
+
+    window.history.pushState(null, '', '/en/')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+
+    expect(callback).toHaveBeenCalledWith(EN_LOCALE)
+    expect(eventListener).toHaveBeenCalledWith(expect.objectContaining({ detail: EN_LOCALE }))
+
+    stopObserving()
+    window.history.pushState(null, '', '/zh/')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+
+    expect(callback).toHaveBeenCalledTimes(1)
+    window.removeEventListener('sheetflow:locale-change', eventListener)
+  })
+
+  it('does not notify for paths without a supported locale', () => {
+    const callback = vi.fn()
+    const stopObserving = observeLocaleChanges(callback)
+
+    window.history.pushState(null, '', '/fr/')
+    window.dispatchEvent(new PopStateEvent('popstate'))
+
+    expect(callback).not.toHaveBeenCalled()
+    stopObserving()
   })
 })
