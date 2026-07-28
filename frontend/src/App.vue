@@ -412,11 +412,13 @@ export default {
         sheets.value = data.sheets || []
 
         // Track upload event
-        window.gtag?.('event', 'file_upload', {
-          file_size: file.value.size,
-          sheet_count: data.sheets?.length || 0,
-          language: locale.value,
-        })
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'file_upload', {
+            file_size: file.value.size,
+            sheet_count: data.sheets?.length || 0,
+            language: locale.value,
+          })
+        }
 
         // Auto select first sheet
         if (sheets.value.length > 0) {
@@ -477,11 +479,13 @@ export default {
         statusPayload.value = data
 
         // Track render event
-        window.gtag?.('event', 'render_start', {
-          sheet_count: selectedSheets.value.length,
-          format: format.value,
-          language: locale.value,
-        })
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'render_start', {
+            sheet_count: selectedSheets.value.length,
+            format: format.value,
+            language: locale.value,
+          })
+        }
 
         // Move to step 3
         step.value = 3
@@ -520,10 +524,12 @@ export default {
 
     const downloadResult = () => {
       if (jobId.value) {
-        window.gtag?.('event', 'file_download', {
-          job_id: jobId.value,
-          language: locale.value,
-        })
+        if (typeof window.gtag === 'function') {
+          window.gtag('event', 'file_download', {
+            job_id: jobId.value,
+            language: locale.value,
+          })
+        }
         window.location.href = `/api/download/${jobId.value}`
       }
     }
@@ -557,12 +563,14 @@ export default {
     const pageNames = { 1: 'upload', 2: 'settings', 3: 'progress' }
     watch(step, (newStep) => {
       const pageName = pageNames[newStep] || 'unknown'
-      window.gtag?.('event', 'page_view', {
-        page_title: `SheetFlow - ${pageName}`,
-        page_location: window.location.href,
-        page_path: `${window.location.pathname}#${pageName}`,
-        language: locale.value,
-      })
+      if (typeof window.gtag === 'function') {
+        window.gtag('event', 'page_view', {
+          page_title: `SheetFlow - ${pageName}`,
+          page_location: window.location.href,
+          page_path: `${window.location.pathname}#${pageName}`,
+          language: locale.value,
+        })
+      }
     })
 
     return {

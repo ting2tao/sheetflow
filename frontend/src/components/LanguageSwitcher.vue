@@ -34,10 +34,12 @@ export default {
       switchLocale(nextLocale)
       locale.value = nextLocale
       document.documentElement.lang = nextLocale
-      window.gtag?.('event', 'language_change', {
-        from_language: previousLocale,
-        to_language: nextLocale,
-      })
+      if (typeof window.gtag === 'function') {
+        window.gtag('event', 'language_change', {
+          from_language: previousLocale,
+          to_language: nextLocale,
+        })
+      }
     }
 
     return {
@@ -57,13 +59,14 @@ export default {
   right: 20px;
   display: inline-flex;
   padding: 3px;
+  border: 1px solid white;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
+  background: #252b62;
 }
 
 .language-switcher button {
   padding: 6px 12px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   color: white;
@@ -72,6 +75,11 @@ export default {
 
 .language-switcher button.active {
   background: white;
-  color: #5f6fdd;
+  color: #3f478f;
+}
+
+.language-switcher button:focus-visible {
+  outline: 3px solid #ffdf5d;
+  outline-offset: 2px;
 }
 </style>

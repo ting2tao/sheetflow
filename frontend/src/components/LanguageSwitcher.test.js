@@ -78,6 +78,17 @@ describe('LanguageSwitcher', () => {
     expect(window.location.pathname).toBe('/zh/')
     expect(window.gtag).not.toHaveBeenCalled()
   })
+
+  it('still switches when gtag exists but is not callable', async () => {
+    window.gtag = {}
+    const { i18n, wrapper } = mountSwitcher()
+
+    await wrapper.get('[data-locale="en-US"]').trigger('click')
+
+    expect(i18n.global.locale.value).toBe('en-US')
+    expect(window.location.pathname).toBe('/en/')
+    expect(document.documentElement.lang).toBe('en-US')
+  })
 })
 
 describe('App language integration', () => {
@@ -135,6 +146,26 @@ describe('App language integration', () => {
     expect(wrapper.vm.file).toBe(file)
     expect(wrapper.vm.step).toBe(2)
     expect(wrapper.get('.settings-section h2').text()).toBe('📋 Select Sheets')
+  })
+
+  it('completes a successful upload when gtag exists but is not callable', async () => {
+    window.history.replaceState(null, '', '/zh/')
+    window.gtag = {}
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        job_id: 'job-no-gtag',
+        sheets: [{ index: 0, name: 'Orders', rows: 10, columns: 4 }],
+      }),
+    }))
+    const { wrapper } = trackedApp()
+
+    await selectFile(wrapper, new File(['sheet'], 'orders.xlsx'))
+    await wrapper.get('.upload-section .btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.vm.step).toBe(2)
+    expect(wrapper.get('.settings-section h2').text()).toBe('📋 选择 Sheet')
   })
 
   it('recomputes a structured job message after a language change', async () => {
