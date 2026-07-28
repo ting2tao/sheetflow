@@ -110,6 +110,15 @@ jobs:
             exit 1
           fi
 
+          case "$VITE_PUBLIC_SITE_URL" in
+            https://*)
+              ;;
+            *)
+              echo "Repository variable PUBLIC_SITE_URL must use HTTPS"
+              exit 1
+              ;;
+          esac
+
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:

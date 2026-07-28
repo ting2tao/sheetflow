@@ -145,16 +145,52 @@ describe('localized SEO entry points', () => {
 })
 
 describe('SEO build configuration', () => {
-  test('requires a public site URL for production builds', async () => {
-    delete process.env.VITE_PUBLIC_SITE_URL
-    const { default: createConfig } = await import('../../vite.config.js')
+  test.each([
+    {
+      label: 'a public HTTPS origin with trailing slashes',
+      value: ' https://sheetflow.example/// ',
+      expected: 'https://sheetflow.example',
+    },
+    {
+      label: 'the local Docker HTTP origin',
+      value: 'http://localhost///',
+      expected: 'http://localhost',
+    },
+    {
+      label: 'the IPv4 loopback HTTP origin',
+      value: 'http://127.0.0.1:8080/',
+      expected: 'http://127.0.0.1:8080',
+    },
+    {
+      label: 'the IPv6 loopback HTTP origin',
+      value: 'http://[::1]:8080/',
+      expected: 'http://[::1]:8080',
+    },
+  ])('accepts and normalizes $label', async ({ value, expected }) => {
+    const { normalizePublicSiteUrl } = await import('../../vite.config.js')
+
+    expect(
+      normalizePublicSiteUrl(value, { mode: 'production' }),
+    ).toBe(expected)
+  })
+
+  test.each([
+    { label: 'a missing value', value: undefined },
+    { label: 'a public HTTP origin', value: 'http://not-production.example' },
+    { label: 'a malformed value', value: 'not a URL' },
+    { label: 'credentials', value: 'https://user:pass@example.com' },
+    { label: 'a query', value: 'https://example.com?preview=true' },
+    { label: 'a hash', value: 'https://example.com#preview' },
+    { label: 'a path', value: 'https://example.com/sheetflow' },
+  ])('rejects $label for production', async ({ value }) => {
+    const { normalizePublicSiteUrl } = await import('../../vite.config.js')
 
     expect(() =>
-      createConfig({ command: 'build', mode: 'production' }),
+      normalizePublicSiteUrl(value, { mode: 'production' }),
     ).toThrow(/VITE_PUBLIC_SITE_URL/)
   })
 
-  test('normalizes the public site URL used in localized HTML', async () => {
+  test('uses the normalized public site URL in localized HTML', async () => {
     process.env.VITE_PUBLIC_SITE_URL = ' https://sheetflow.example/// '
     const { default: createConfig } = await import('../../vite.config.js')
     const config = createConfig({ command: 'build', mode: 'production' })
@@ -267,6 +303,8 @@ describe('SEO build configuration', () => {
     expect(dockerfile).toContain('ENV VITE_PUBLIC_SITE_URL=$VITE_PUBLIC_SITE_URL')
     expect(compose).toContain('VITE_PUBLIC_SITE_URL: ${VITE_PUBLIC_SITE_URL:-http://localhost}')
     expect(workflow).toContain('VITE_PUBLIC_SITE_URL: ${{ vars.PUBLIC_SITE_URL }}')
+    expect(workflow).toContain('case "$VITE_PUBLIC_SITE_URL" in')
+    expect(workflow).toContain('https://*)')
     expect(workflow).toContain('build-args: |')
   })
 })

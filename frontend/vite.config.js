@@ -5,13 +5,71 @@ import vue from '@vitejs/plugin-vue'
 
 const configRoot = fileURLToPath(new URL('.', import.meta.url))
 
+export function normalizePublicSiteUrl(value, { mode = 'development' } = {}) {
+  const normalized = typeof value === 'string'
+    ? value.trim().replace(/\/+$/, '')
+    : ''
+
+  if (!normalized) {
+    if (mode === 'production') {
+      throw new Error('VITE_PUBLIC_SITE_URL is required for production builds')
+    }
+
+    return ''
+  }
+
+  let siteUrl
+
+  try {
+    siteUrl = new URL(normalized)
+  } catch {
+    throw new Error('VITE_PUBLIC_SITE_URL must be a valid absolute URL')
+  }
+
+  if (!['http:', 'https:'].includes(siteUrl.protocol)) {
+    throw new Error('VITE_PUBLIC_SITE_URL must use HTTP or HTTPS')
+  }
+
+  if (siteUrl.username || siteUrl.password) {
+    throw new Error('VITE_PUBLIC_SITE_URL must not contain credentials')
+  }
+
+  if (
+    siteUrl.search ||
+    siteUrl.hash ||
+    normalized.includes('?') ||
+    normalized.includes('#')
+  ) {
+    throw new Error('VITE_PUBLIC_SITE_URL must not contain a query or hash')
+  }
+
+  if (siteUrl.pathname !== '/') {
+    throw new Error('VITE_PUBLIC_SITE_URL must not contain a path')
+  }
+
+  const localHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
+  const isLocalHttp =
+    siteUrl.protocol === 'http:' && localHosts.has(siteUrl.hostname)
+
+  if (
+    mode === 'production' &&
+    siteUrl.protocol !== 'https:' &&
+    !isLocalHttp
+  ) {
+    throw new Error(
+      'VITE_PUBLIC_SITE_URL must use HTTPS except for local development',
+    )
+  }
+
+  return normalized
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, configRoot, '')
-  const publicSiteUrl = env.VITE_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')
-
-  if (mode === 'production' && !publicSiteUrl) {
-    throw new Error('VITE_PUBLIC_SITE_URL is required for production builds')
-  }
+  const publicSiteUrl = normalizePublicSiteUrl(
+    env.VITE_PUBLIC_SITE_URL,
+    { mode },
+  )
 
   return {
     plugins: [vue()],
