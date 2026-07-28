@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -45,11 +45,11 @@ describe('localized SEO entry points', () => {
     expect(html).toContain('hreflang="x-default"')
     expect(html).toContain('content="%VITE_PUBLIC_SITE_URL%/zh/"')
     expect(
-      html.match(/content="%VITE_PUBLIC_SITE_URL%\/favicon\.svg"/g),
+      html.match(/content="%VITE_PUBLIC_SITE_URL%\/og-image\.png"/g),
     ).toHaveLength(2)
-    expect(
-      (await stat(path.join(frontendDir, 'public/favicon.svg'))).isFile(),
-    ).toBe(true)
+    expect(html).not.toContain(
+      'content="%VITE_PUBLIC_SITE_URL%/favicon.svg"',
+    )
     expect(html).toContain('"inLanguage": "zh-CN"')
     expect(html).toContain('"priceCurrency": "CNY"')
     expect(html).toContain('<div id="app"></div>')
@@ -77,11 +77,11 @@ describe('localized SEO entry points', () => {
     expect(html).toContain('hreflang="x-default"')
     expect(html).toContain('content="%VITE_PUBLIC_SITE_URL%/en/"')
     expect(
-      html.match(/content="%VITE_PUBLIC_SITE_URL%\/favicon\.svg"/g),
+      html.match(/content="%VITE_PUBLIC_SITE_URL%\/og-image\.png"/g),
     ).toHaveLength(2)
-    expect(
-      (await stat(path.join(frontendDir, 'public/favicon.svg'))).isFile(),
-    ).toBe(true)
+    expect(html).not.toContain(
+      'content="%VITE_PUBLIC_SITE_URL%/favicon.svg"',
+    )
     expect(html).toContain('"inLanguage": "en-US"')
     expect(html).toContain('"priceCurrency": "USD"')
     expect(html).toContain('<div id="app"></div>')
@@ -130,6 +130,17 @@ describe('localized SEO entry points', () => {
       'Sitemap: __SHEETFLOW_PUBLIC_SITE_URL__/sitemap.xml',
     )
     expect(robots).not.toContain('yourdomain')
+  })
+
+  test('ships a 1200 by 630 PNG social sharing image', async () => {
+    const image = await readFile(
+      path.join(frontendDir, 'public/og-image.png'),
+    )
+
+    expect(image.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')
+    expect(image.subarray(12, 16).toString('ascii')).toBe('IHDR')
+    expect(image.readUInt32BE(16)).toBe(1200)
+    expect(image.readUInt32BE(20)).toBe(630)
   })
 })
 
