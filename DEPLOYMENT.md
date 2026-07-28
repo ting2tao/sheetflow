@@ -37,6 +37,16 @@ GitHub Container Registry (ghcr.io)
 | `GHCR_USERNAME` | GitHub 用户名 | `ting2tao` |
 | `GHCR_TOKEN` | GitHub Personal Access Token | `ghp_xxxx` |
 
+同时在 `Settings` → `Secrets and variables` → `Actions` → `Variables`
+中添加 GitHub Actions 仓库变量：
+
+| Variable 名称 | 说明 |
+|---------------|------|
+| `PUBLIC_SITE_URL` | 前端对外公开的 HTTPS 源站地址，末尾不带斜杠 |
+
+CI 构建前端镜像时必须读取 `PUBLIC_SITE_URL`；未配置时工作流会直接失败。
+该值不是容器启动时配置，而是通过 `VITE_PUBLIC_SITE_URL` 在前端构建时写入。
+
 ### 3. ECS 环境准备
 
 确保 ECS 上已安装：
@@ -57,6 +67,43 @@ docker compose version
 ```
 
 ## 使用方法
+
+### 前端公开地址
+
+构建任何生产前端镜像前，先将 `VITE_PUBLIC_SITE_URL` 设置为部署站点的公开
+HTTPS 源站地址，且末尾不带斜杠。该地址会嵌入以下构建产物：
+
+- canonical 和 hreflang 链接
+- Open Graph 与 Twitter Card 元数据
+- JSON-LD 结构化数据
+- `sitemap.xml` 和 `robots.txt`
+
+下面使用 `https://sheetflow.example` 这一保留域名作为示例；实际构建必须替换成
+真实公开源站：
+
+```bash
+export VITE_PUBLIC_SITE_URL=https://sheetflow.example
+test -n "$VITE_PUBLIC_SITE_URL"
+
+case "$VITE_PUBLIC_SITE_URL" in
+  https://*) ;;
+  *) echo "VITE_PUBLIC_SITE_URL must use HTTPS" >&2; exit 1 ;;
+esac
+
+test "${VITE_PUBLIC_SITE_URL%/}" = "$VITE_PUBLIC_SITE_URL"
+
+docker build \
+  --build-arg VITE_PUBLIC_SITE_URL="$VITE_PUBLIC_SITE_URL" \
+  -t sheetflow-frontend ./frontend
+```
+
+使用 Compose 在本地构建时也应显式传入该变量：
+
+```bash
+export VITE_PUBLIC_SITE_URL=https://sheetflow.example
+test -n "$VITE_PUBLIC_SITE_URL"
+docker compose build frontend
+```
 
 ### 自动构建
 
@@ -92,8 +139,27 @@ git push origin v1.0.0
 
 部署完成后：
 
-- **前端**: `http://<ECS_IP>:80`
-- **后端 API**: `http://<ECS_IP>:8000`
+- **中文前端**：`/zh/`
+- **英文前端**：`/en/`
+- **后端 API**：`/api/`
+
+生产 Nginx 会将 `/zh` 和 `/en` 以 301 规范重定向到 `/zh/` 和 `/en/`。
+根路径 `/` 是语言选择入口；站内语言切换不会刷新应用，因此会保留进行中的状态。
+Open Graph 分享图片位于 `/og-image.png`。
+
+部署后可用同一个已验证的公开地址检查关键产物：
+
+```bash
+test -n "$VITE_PUBLIC_SITE_URL"
+
+curl -fsSI "$VITE_PUBLIC_SITE_URL/zh"
+curl -fsSI "$VITE_PUBLIC_SITE_URL/en"
+curl -fsS "$VITE_PUBLIC_SITE_URL/zh/" | grep -F "$VITE_PUBLIC_SITE_URL/zh/"
+curl -fsS "$VITE_PUBLIC_SITE_URL/en/" | grep -F "$VITE_PUBLIC_SITE_URL/en/"
+curl -fsS "$VITE_PUBLIC_SITE_URL/robots.txt"
+curl -fsS "$VITE_PUBLIC_SITE_URL/sitemap.xml"
+curl -fsSI "$VITE_PUBLIC_SITE_URL/og-image.png"
+```
 
 ## 数据持久化
 
