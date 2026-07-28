@@ -93,4 +93,50 @@ describe('message catalog contracts', () => {
 
     expect(messages['zh-CN'].seo.faq[0][1]).toBe('目前支持 .xlsx 格式。')
   })
+
+  it('matches the exact English error and SEO copy contract', () => {
+    expect(messages['en-US'].errors).toMatchObject({
+      'file.not_found': 'The file no longer exists. Please upload it again.',
+      'job.not_found': 'The job does not exist. Please upload the file again.',
+      'job.not_completed': 'The job is not complete yet.',
+      'output.not_found': 'The ZIP file does not exist.',
+    })
+
+    expect(messages['en-US'].seo).toEqual({
+      whatTitle: '🎯 What is SheetFlow?',
+      whatBody: 'SheetFlow is a free online Excel-to-image tool. Upload an Excel file, choose pagination rules, and download the generated high-quality images in a ZIP archive.',
+      featuresTitle: '✨ Key Features',
+      features: [
+        ['Excel to image', 'Supports .xlsx files and preserves table styling'],
+        ['Smart pagination', 'Choose header rows and data rows per page'],
+        ['Repeated headers', 'Include fixed headers in every image'],
+        ['Multiple formats', 'Export PNG or JPG images'],
+        ['Batch processing', 'Process multiple sheets in one job'],
+        ['One-click download', 'Download all images in a ZIP archive'],
+      ],
+      scenariosTitle: '📋 Use Cases',
+      scenarios: [
+        ['💰 Refund forms', 'Generate refund-form images for customer support'],
+        ['📦 Order snapshots', 'Convert order data into images for sharing or archiving'],
+        ['📊 Data reports', 'Turn Excel reports into presentation-ready images'],
+        ['🎨 Marketing assets', 'Create table-based campaign assets quickly'],
+      ],
+      usageTitle: '🚀 How to Use SheetFlow',
+      usage: [
+        'Upload an .xlsx Excel file',
+        'Select the sheets to process',
+        'Set header rows and data rows per page',
+        'Choose PNG or JPG',
+        'Click Generate',
+        'Download the ZIP archive',
+      ],
+      faqTitle: '❓ Frequently Asked Questions',
+      faq: [
+        ['Which Excel formats are supported?', 'SheetFlow currently supports .xlsx files.'],
+        ['Are complex Excel formulas supported?', 'SheetFlow reads cached formula results but does not recalculate formulas.'],
+        ['What image quality does SheetFlow use?', 'Images are rendered at 2x resolution. PNG is lossless, while JPG quality is adjustable.'],
+        ['Is there a file-size limit?', 'For the best experience, use files under 10 MB and sheets under 10,000 rows.'],
+      ],
+    })
+  })
 })
