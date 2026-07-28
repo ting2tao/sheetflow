@@ -94,12 +94,13 @@ npm install
 # 运行前端测试
 npm test
 
-# 启动开发服务器
-npm run dev
+# 使用明确的本地公开地址启动开发服务器
+VITE_PUBLIC_SITE_URL=http://localhost:3000 npm run dev
 ```
 
 访问 http://localhost:3000/zh/ 或 http://localhost:3000/en/。Vite 开发服务器会将
-`/api` 请求代理到 8000 端口的后端。
+`/api` 请求代理到 8000 端口的后端。不设置该变量时也可以直接运行
+`npm run dev`；上面的明确写法可确保开发环境的元数据 URL 指向本地服务器。
 
 验证生产构建时，将 `VITE_PUBLIC_SITE_URL` 设置为网站对外公开的 HTTPS 源站地址，
 且末尾不带斜杠：

@@ -154,10 +154,12 @@ test -n "$VITE_PUBLIC_SITE_URL"
 
 curl -fsSI "$VITE_PUBLIC_SITE_URL/zh"
 curl -fsSI "$VITE_PUBLIC_SITE_URL/en"
+curl -fsS "$VITE_PUBLIC_SITE_URL/zh/" | grep 'lang="zh-CN"'
+curl -fsS "$VITE_PUBLIC_SITE_URL/en/" | grep 'lang="en-US"'
 curl -fsS "$VITE_PUBLIC_SITE_URL/zh/" | grep -F "$VITE_PUBLIC_SITE_URL/zh/"
 curl -fsS "$VITE_PUBLIC_SITE_URL/en/" | grep -F "$VITE_PUBLIC_SITE_URL/en/"
 curl -fsS "$VITE_PUBLIC_SITE_URL/robots.txt"
-curl -fsS "$VITE_PUBLIC_SITE_URL/sitemap.xml"
+curl -fsS "$VITE_PUBLIC_SITE_URL/sitemap.xml" | grep '/en/'
 curl -fsSI "$VITE_PUBLIC_SITE_URL/og-image.png"
 ```
 

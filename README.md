@@ -94,12 +94,14 @@ npm install
 # Run the frontend test suite
 npm test
 
-# Start development server
-npm run dev
+# Start the development server with an explicit local public origin
+VITE_PUBLIC_SITE_URL=http://localhost:3000 npm run dev
 ```
 
 Visit http://localhost:3000/zh/ or http://localhost:3000/en/. The Vite
 development server proxies `/api` requests to the backend on port 8000.
+`npm run dev` also works without this variable; the explicit form above keeps
+the development metadata URLs tied to the local server.
 
 To verify a production build, set `VITE_PUBLIC_SITE_URL` to the site's public
 HTTPS origin with no trailing slash:
