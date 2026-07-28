@@ -46,13 +46,6 @@ describe('localizeJobMessage', () => {
     }, translator())).toBe('Something went wrong. Please try again.')
   })
 
-  it('uses singular English nouns when one sheet generates one image', () => {
-    expect(localizeJobMessage({
-      message_code: 'completed',
-      message_params: { sheets: 1, pages: 1 },
-    }, translator())).toBe('Complete! Processed 1 sheet and generated 1 image')
-  })
-
   it('returns the generic error for a null job payload', () => {
     expect(localizeJobMessage(null, translator())).toBe(
       'Something went wrong. Please try again.',
@@ -65,5 +58,39 @@ describe('localizeApiError', () => {
     expect(localizeApiError({
       detail: { code: 'file.unsupported_type', params: { supported: '.xlsx' } },
     }, translator())).toBe('Only .xlsx Excel files are supported.')
+  })
+})
+
+describe('message catalog contracts', () => {
+  it('interpolates and pluralizes page counts', () => {
+    expect(translator('zh-CN')('progress.pageCount', { count: 2 })).toBe('2 页')
+    expect(translator()('progress.pageCount', { count: 1 }, 1)).toBe('1 page')
+    expect(translator()('progress.pageCount', { count: 2 }, 2)).toBe('2 pages')
+  })
+
+  it('interpolates error prefixes', () => {
+    expect(translator('zh-CN')('errors.prefix', { message: '失败' })).toBe('错误：失败')
+    expect(translator()('errors.prefix', { message: 'failed' })).toBe('Error: failed')
+  })
+
+  it('uses title-description tuples for SEO collection items', () => {
+    for (const locale of ['zh-CN', 'en-US']) {
+      const seo = messages[locale].seo
+      expect(seo.features).toHaveLength(6)
+      expect(seo.scenarios).toHaveLength(4)
+      expect(seo.faq).toHaveLength(4)
+
+      for (const collection of [seo.features, seo.scenarios, seo.faq]) {
+        expect(collection.every(item => (
+          Array.isArray(item)
+          && item.length === 2
+          && item.every(value => typeof value === 'string')
+        ))).toBe(true)
+      }
+
+      expect(seo.usage.every(item => typeof item === 'string')).toBe(true)
+    }
+
+    expect(messages['zh-CN'].seo.faq[0][1]).toBe('目前支持 .xlsx 格式。')
   })
 })

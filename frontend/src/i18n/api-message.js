@@ -39,10 +39,7 @@ export function localizeJobMessage(payload = {}, t) {
       && typeof normalizedPayload.message_params === 'object'
       ? normalizedPayload.message_params
       : {}
-    const key = code === 'completed' && Number(params.pages) === 1
-      ? 'job.completed_one_page'
-      : `job.${code}`
-    return translate(t, key, params, code === 'completed' ? params.sheets : undefined)
+    return translate(t, `job.${code}`, params, code === 'completed' ? params.sheets : undefined)
   }
 
   if (!messageCode && typeof normalizedPayload.message === 'string' && normalizedPayload.message) {
