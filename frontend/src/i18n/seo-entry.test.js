@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -44,7 +44,12 @@ describe('localized SEO entry points', () => {
     expect(html).toContain('hreflang="zh-CN"')
     expect(html).toContain('hreflang="x-default"')
     expect(html).toContain('content="%VITE_PUBLIC_SITE_URL%/zh/"')
-    expect(html).toContain('content="%VITE_PUBLIC_SITE_URL%/og-image.png"')
+    expect(
+      html.match(/content="%VITE_PUBLIC_SITE_URL%\/favicon\.svg"/g),
+    ).toHaveLength(2)
+    expect(
+      (await stat(path.join(frontendDir, 'public/favicon.svg'))).isFile(),
+    ).toBe(true)
     expect(html).toContain('"inLanguage": "zh-CN"')
     expect(html).toContain('"priceCurrency": "CNY"')
     expect(html).toContain('<div id="app"></div>')
@@ -71,7 +76,12 @@ describe('localized SEO entry points', () => {
     expect(html).toContain('hreflang="en"')
     expect(html).toContain('hreflang="x-default"')
     expect(html).toContain('content="%VITE_PUBLIC_SITE_URL%/en/"')
-    expect(html).toContain('content="%VITE_PUBLIC_SITE_URL%/og-image.png"')
+    expect(
+      html.match(/content="%VITE_PUBLIC_SITE_URL%\/favicon\.svg"/g),
+    ).toHaveLength(2)
+    expect(
+      (await stat(path.join(frontendDir, 'public/favicon.svg'))).isFile(),
+    ).toBe(true)
     expect(html).toContain('"inLanguage": "en-US"')
     expect(html).toContain('"priceCurrency": "USD"')
     expect(html).toContain('<div id="app"></div>')
@@ -213,6 +223,19 @@ describe('SEO build configuration', () => {
     )
     expect(main).toContain('.use(i18n).mount')
     expect(nginx).toMatch(/location = \/ \{[\s\S]*try_files \/index\.html =404;/)
+    // Exact locations take precedence over the generic localized fallback.
+    expect(nginx).toContain(
+      'location = /robots.txt {\n        try_files /robots.txt =404;\n    }',
+    )
+    expect(nginx).toContain(
+      'location = /sitemap.xml {\n        try_files /sitemap.xml =404;\n    }',
+    )
+    expect(nginx).toContain(
+      'location = /zh {\n        return 301 /zh/;\n    }',
+    )
+    expect(nginx).toContain(
+      'location = /en {\n        return 301 /en/;\n    }',
+    )
     expect(nginx).toContain('location /api/ {')
     expect(nginx).not.toContain('location ^~ /api/ {')
     expect(nginx).toContain('location /download/ {')
