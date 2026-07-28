@@ -102,8 +102,8 @@ VITE_PUBLIC_SITE_URL=http://localhost:3000 npm run dev
 `/api` 请求代理到 8000 端口的后端。不设置该变量时也可以直接运行
 `npm run dev`；上面的明确写法可确保开发环境的元数据 URL 指向本地服务器。
 
-验证生产构建时，将 `VITE_PUBLIC_SITE_URL` 设置为网站对外公开的 HTTPS 源站地址，
-且末尾不带斜杠：
+验证生产构建时，将 `VITE_PUBLIC_SITE_URL` 设置为网站对外公开的 HTTPS 源站地址。
+构建会自动规范化末尾斜杠，但建议配置时省略：
 
 ```bash
 cd frontend

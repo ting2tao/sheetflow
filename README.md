@@ -104,7 +104,8 @@ development server proxies `/api` requests to the backend on port 8000.
 the development metadata URLs tied to the local server.
 
 To verify a production build, set `VITE_PUBLIC_SITE_URL` to the site's public
-HTTPS origin with no trailing slash:
+HTTPS origin. The build normalizes a trailing slash, but omitting it is
+recommended:
 
 ```bash
 cd frontend

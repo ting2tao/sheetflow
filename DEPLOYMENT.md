@@ -42,10 +42,11 @@ GitHub Container Registry (ghcr.io)
 
 | Variable 名称 | 说明 |
 |---------------|------|
-| `PUBLIC_SITE_URL` | 前端对外公开的 HTTPS 源站地址，末尾不带斜杠 |
+| `PUBLIC_SITE_URL` | 前端对外公开的 HTTPS 源站地址；建议末尾不带斜杠 |
 
-CI 构建前端镜像时必须读取 `PUBLIC_SITE_URL`；未配置时工作流会直接失败。
-该值不是容器启动时配置，而是通过 `VITE_PUBLIC_SITE_URL` 在前端构建时写入。
+CI 构建前端镜像时必须读取 `PUBLIC_SITE_URL`，并会拒绝非 HTTPS 地址；未配置时
+工作流也会直接失败。该值不是容器启动时配置，而是通过
+`VITE_PUBLIC_SITE_URL` 在前端构建时写入。
 
 ### 3. ECS 环境准备
 
@@ -71,7 +72,8 @@ docker compose version
 ### 前端公开地址
 
 构建任何生产前端镜像前，先将 `VITE_PUBLIC_SITE_URL` 设置为部署站点的公开
-HTTPS 源站地址，且末尾不带斜杠。该地址会嵌入以下构建产物：
+HTTPS 源站地址。构建会自动移除末尾斜杠，但建议配置时直接省略。该地址会嵌入
+以下构建产物：
 
 - canonical 和 hreflang 链接
 - Open Graph 与 Twitter Card 元数据
@@ -89,8 +91,6 @@ case "$VITE_PUBLIC_SITE_URL" in
   https://*) ;;
   *) echo "VITE_PUBLIC_SITE_URL must use HTTPS" >&2; exit 1 ;;
 esac
-
-test "${VITE_PUBLIC_SITE_URL%/}" = "$VITE_PUBLIC_SITE_URL"
 
 docker build \
   --build-arg VITE_PUBLIC_SITE_URL="$VITE_PUBLIC_SITE_URL" \
@@ -121,9 +121,10 @@ git push origin v1.0.0
 ### 手动部署
 
 1. 进入仓库的 `Actions` 页面
-2. 选择 `Deploy to Aliyun ECS` 工作流
+2. 选择 `CI/CD` 工作流
 3. 点击 `Run workflow`
-4. 输入镜像 tag（留空则自动使用最新 git tag，无 tag 时回退到 `main`）
+4. 填写可选的 `image_tag`：手动运行时留空会部署 `main`，不会自动选择最新的
+   Git tag；如需部署版本镜像，必须显式填写其 tag，例如 `v1.0.0`
 5. 点击 `Run workflow` 按钮
 
 ## 镜像标签说明
@@ -152,8 +153,14 @@ Open Graph 分享图片位于 `/og-image.png`。
 ```bash
 test -n "$VITE_PUBLIC_SITE_URL"
 
-curl -fsSI "$VITE_PUBLIC_SITE_URL/zh"
-curl -fsSI "$VITE_PUBLIC_SITE_URL/en"
+zh_headers=$(curl -fsSI "$VITE_PUBLIC_SITE_URL/zh" | tr -d '\r')
+printf '%s\n' "$zh_headers" | grep -q '^HTTP/.* 301'
+printf '%s\n' "$zh_headers" | grep -qi "^location: $VITE_PUBLIC_SITE_URL/zh/$"
+
+en_headers=$(curl -fsSI "$VITE_PUBLIC_SITE_URL/en" | tr -d '\r')
+printf '%s\n' "$en_headers" | grep -q '^HTTP/.* 301'
+printf '%s\n' "$en_headers" | grep -qi "^location: $VITE_PUBLIC_SITE_URL/en/$"
+
 curl -fsS "$VITE_PUBLIC_SITE_URL/zh/" | grep 'lang="zh-CN"'
 curl -fsS "$VITE_PUBLIC_SITE_URL/en/" | grep 'lang="en-US"'
 curl -fsS "$VITE_PUBLIC_SITE_URL/zh/" | grep -F "$VITE_PUBLIC_SITE_URL/zh/"
