@@ -4,13 +4,21 @@ import { fileURLToPath } from 'node:url'
 
 const token = '__SHEETFLOW_PUBLIC_SITE_URL__'
 const frontendDir = fileURLToPath(new URL('../', import.meta.url))
-const siteUrl = process.env.VITE_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')
+const rawSiteUrl = process.env.VITE_PUBLIC_SITE_URL?.trim().replace(/\/+$/, '')
 const distDir = process.env.SHEETFLOW_DIST_DIR
   ? resolve(process.env.SHEETFLOW_DIST_DIR)
   : resolve(frontendDir, 'dist')
 
-if (!siteUrl) {
+if (!rawSiteUrl) {
   throw new Error('VITE_PUBLIC_SITE_URL is required to write SEO files')
+}
+
+let siteUrl
+
+try {
+  siteUrl = new URL(rawSiteUrl).origin
+} catch {
+  throw new Error('VITE_PUBLIC_SITE_URL must be a valid absolute URL')
 }
 
 for (const fileName of ['sitemap.xml', 'robots.txt']) {

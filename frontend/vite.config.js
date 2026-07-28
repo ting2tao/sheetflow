@@ -6,11 +6,9 @@ import vue from '@vitejs/plugin-vue'
 const configRoot = fileURLToPath(new URL('.', import.meta.url))
 
 export function normalizePublicSiteUrl(value, { mode = 'development' } = {}) {
-  const normalized = typeof value === 'string'
-    ? value.trim().replace(/\/+$/, '')
-    : ''
+  const trimmed = typeof value === 'string' ? value.trim() : ''
 
-  if (!normalized) {
+  if (!trimmed) {
     if (mode === 'production') {
       throw new Error('VITE_PUBLIC_SITE_URL is required for production builds')
     }
@@ -21,7 +19,7 @@ export function normalizePublicSiteUrl(value, { mode = 'development' } = {}) {
   let siteUrl
 
   try {
-    siteUrl = new URL(normalized)
+    siteUrl = new URL(trimmed)
   } catch {
     throw new Error('VITE_PUBLIC_SITE_URL must be a valid absolute URL')
   }
@@ -37,13 +35,16 @@ export function normalizePublicSiteUrl(value, { mode = 'development' } = {}) {
   if (
     siteUrl.search ||
     siteUrl.hash ||
-    normalized.includes('?') ||
-    normalized.includes('#')
+    trimmed.includes('?') ||
+    trimmed.includes('#')
   ) {
     throw new Error('VITE_PUBLIC_SITE_URL must not contain a query or hash')
   }
 
-  if (siteUrl.pathname !== '/') {
+  const rawOriginPattern =
+    /^[A-Za-z][A-Za-z\d+.-]*:\/\/[^/\\?#\s]+\/*$/
+
+  if (!rawOriginPattern.test(trimmed)) {
     throw new Error('VITE_PUBLIC_SITE_URL must not contain a path')
   }
 
@@ -61,7 +62,7 @@ export function normalizePublicSiteUrl(value, { mode = 'development' } = {}) {
     )
   }
 
-  return normalized
+  return siteUrl.origin
 }
 
 export default defineConfig(({ mode }) => {

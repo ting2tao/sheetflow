@@ -181,7 +181,10 @@ describe('SEO build configuration', () => {
     { label: 'credentials', value: 'https://user:pass@example.com' },
     { label: 'a query', value: 'https://example.com?preview=true' },
     { label: 'a hash', value: 'https://example.com#preview' },
-    { label: 'a path', value: 'https://example.com/sheetflow' },
+    { label: 'an encoded dot path', value: 'https://example.com/%2e%2e' },
+    { label: 'an encoded slash path', value: 'https://example.com/%2F' },
+    { label: 'a dot segment path', value: 'https://example.com/..' },
+    { label: 'a path', value: 'https://example.com/path' },
   ])('rejects $label for production', async ({ value }) => {
     const { normalizePublicSiteUrl } = await import('../../vite.config.js')
 
@@ -221,7 +224,7 @@ describe('SEO build configuration', () => {
       cwd: frontendDir,
       env: {
         ...process.env,
-        VITE_PUBLIC_SITE_URL: 'https://sheetflow.example///',
+        VITE_PUBLIC_SITE_URL: 'https://sheetflow.example:443///',
         SHEETFLOW_DIST_DIR: distDir,
       },
     })
@@ -310,5 +313,39 @@ describe('SEO build configuration', () => {
       "description: 'Docker image tag to deploy (for example v1.0.0). Leave empty to use the triggering tag, or main for a branch/manual run.'",
     )
     expect(workflow).not.toContain('use the latest tag')
+  })
+
+  test('runs backend and frontend tests before building deployment images', async () => {
+    const workflow = await readRepositoryFile('.github/workflows/ci-cd.yml')
+    const backendJob = workflow.slice(
+      workflow.indexOf('  build-backend:'),
+      workflow.indexOf('  build-frontend:'),
+    )
+    const frontendJob = workflow.slice(
+      workflow.indexOf('  build-frontend:'),
+      workflow.indexOf('  deploy:'),
+    )
+
+    expect(backendJob).toContain('uses: actions/setup-python@v5')
+    expect(backendJob).toContain("python-version: '3.11'")
+    expect(backendJob).toContain(
+      'pip install -r backend/requirements-dev.txt',
+    )
+    expect(backendJob).toContain('cd backend && PYTHONPATH=. pytest -q')
+    expect(backendJob.indexOf('PYTHONPATH=. pytest -q')).toBeLessThan(
+      backendJob.indexOf('- name: Build and push backend image'),
+    )
+
+    expect(frontendJob).toContain('uses: actions/setup-node@v4')
+    expect(frontendJob).toContain("node-version: '20'")
+    expect(frontendJob).toContain('cache: npm')
+    expect(frontendJob).toContain(
+      'cache-dependency-path: frontend/package-lock.json',
+    )
+    expect(frontendJob).toContain('cd frontend && npm ci')
+    expect(frontendJob).toContain('cd frontend && npm test')
+    expect(frontendJob.indexOf('cd frontend && npm test')).toBeLessThan(
+      frontendJob.indexOf('- name: Build and push frontend image'),
+    )
   })
 })
