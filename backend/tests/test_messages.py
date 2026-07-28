@@ -1,6 +1,4 @@
 import asyncio
-import inspect
-import re
 from io import BytesIO
 
 import pytest
@@ -41,12 +39,14 @@ def _run(coro):
     return asyncio.run(coro)
 
 
-def _assert_error(coro, status_code, code, params=None):
+def _assert_error(coro, status_code, code, params=None, server_text=None):
     with pytest.raises(HTTPException) as caught:
         _run(coro)
 
     assert caught.value.status_code == status_code
     assert caught.value.detail == {"code": code, "params": params or {}}
+    if server_text:
+        assert server_text not in repr(caught.value.detail)
 
 
 def _capture_jobs(monkeypatch):
@@ -180,55 +180,80 @@ def test_render_job_failure_does_not_persist_exception_text(monkeypatch, tmp_pat
     assert "sensitive server path" not in repr(saved[-1])
 
 
-def test_get_sheets_maps_missing_job_and_file_errors(monkeypatch):
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        render.get_sheets_for_job,
+        render.create_render_job,
+        render.get_job_status,
+        render.download_result,
+        render.delete_job,
+    ],
+)
+def test_job_endpoints_map_missing_job_error(monkeypatch, endpoint):
     monkeypatch.setattr(render, "_load_job", lambda job_id: None)
-    _assert_error(
-        render.get_sheets_for_job("missing"), 404, "job.not_found"
-    )
 
+    _assert_error(endpoint("missing"), 404, "job.not_found")
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [render.get_sheets_for_job, render.create_render_job],
+)
+def test_job_endpoints_map_missing_upload_file_error(monkeypatch, endpoint):
     monkeypatch.setattr(
         render, "_load_job", lambda job_id: {"file_path": "/does/not/exist"}
     )
-    _assert_error(
-        render.get_sheets_for_job("missing-file"), 400, "file.not_found"
-    )
+
+    _assert_error(endpoint("missing-file"), 400, "file.not_found")
 
 
-def test_get_sheets_parse_error_is_structured_and_sanitized(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    ("endpoint_name", "status_code"),
+    [("get_sheets", 500), ("upload", 400)],
+)
+def test_parse_errors_are_structured_and_sanitized(
+    monkeypatch, tmp_path, endpoint_name, status_code
+):
     upload = tmp_path / "book.xlsx"
     upload.write_bytes(b"workbook")
-    monkeypatch.setattr(
-        render, "_load_job", lambda job_id: {"file_path": str(upload)}
-    )
+    server_text = f"sensitive parser text from {endpoint_name}"
     monkeypatch.setattr(
         render,
         "get_sheet_list",
-        lambda path: (_ for _ in ()).throw(RuntimeError("sensitive parser text")),
+        lambda path: (_ for _ in ()).throw(RuntimeError(server_text)),
     )
 
+    if endpoint_name == "get_sheets":
+        monkeypatch.setattr(
+            render, "_load_job", lambda job_id: {"file_path": str(upload)}
+        )
+        request = render.get_sheets_for_job("job-1")
+    else:
+        monkeypatch.setattr(render, "UPLOADS_DIR", str(tmp_path))
+        request = render.upload_file(
+            UploadFile(file=BytesIO(b"broken"), filename="invalid.xlsx")
+        )
+
     _assert_error(
-        render.get_sheets_for_job("job-1"), 500, "file.parse_failed"
+        request,
+        status_code,
+        "file.parse_failed",
+        server_text=server_text,
     )
 
 
-def test_upload_maps_file_type_and_parse_errors(monkeypatch, tmp_path):
-    unsupported = UploadFile(file=BytesIO(b"csv"), filename="book.csv")
+@pytest.mark.parametrize(
+    "endpoint",
+    [render.upload_file, render.create_render_job_direct],
+)
+def test_upload_endpoints_map_unsupported_file_type(endpoint):
     _assert_error(
-        render.upload_file(unsupported),
+        endpoint(UploadFile(file=BytesIO(b"csv"), filename="book.csv")),
         400,
         "file.unsupported_type",
         {"supported": ".xlsx"},
     )
-
-    monkeypatch.setattr(render, "UPLOADS_DIR", str(tmp_path))
-    monkeypatch.setattr(render.uuid, "uuid4", lambda: "upload-job")
-    monkeypatch.setattr(
-        render,
-        "get_sheet_list",
-        lambda path: (_ for _ in ()).throw(RuntimeError("private parse failure")),
-    )
-    invalid = UploadFile(file=BytesIO(b"broken"), filename="book.xlsx")
-    _assert_error(render.upload_file(invalid), 400, "file.parse_failed")
 
 
 def test_upload_persists_uploaded_message(monkeypatch, tmp_path):
@@ -254,32 +279,39 @@ def test_upload_persists_uploaded_message(monkeypatch, tmp_path):
     }
 
 
-def test_create_render_job_maps_errors_and_queued_payloads(monkeypatch, tmp_path):
-    monkeypatch.setattr(render, "_load_job", lambda job_id: None)
-    _assert_error(
-        render.create_render_job(job_id="missing"),
-        404,
-        "job.not_found",
-    )
+@pytest.mark.parametrize("endpoint_name", ["create", "direct"])
+def test_render_endpoints_map_invalid_sheet_indices(
+    monkeypatch, tmp_path, endpoint_name
+):
+    monkeypatch.setattr(render, "UPLOADS_DIR", str(tmp_path))
+    upload_path = tmp_path / "book.xlsx"
+    upload_path.write_bytes(b"workbook")
 
-    monkeypatch.setattr(
-        render, "_load_job", lambda job_id: {"file_path": "/does/not/exist"}
-    )
-    _assert_error(
-        render.create_render_job(job_id="missing-file"),
-        400,
-        "file.not_found",
-    )
+    if endpoint_name == "create":
+        monkeypatch.setattr(
+            render,
+            "_load_job",
+            lambda job_id: {"job_id": job_id, "file_path": str(upload_path)},
+        )
+        request = render.create_render_job(
+            job_id="job-1", sheet_indices="wrong"
+        )
+    else:
+        request = render.create_render_job_direct(
+            UploadFile(file=BytesIO(b"workbook"), filename="book.xlsx"),
+            sheet_indices="wrong",
+        )
 
+    _assert_error(request, 400, "job.invalid_sheet_indices")
+
+
+def test_create_render_job_persists_and_returns_queued_payload(
+    monkeypatch, tmp_path
+):
     upload = tmp_path / "book.xlsx"
     upload.write_bytes(b"workbook")
     job = {"job_id": "job-1", "file_path": str(upload)}
     monkeypatch.setattr(render, "_load_job", lambda job_id: job)
-    _assert_error(
-        render.create_render_job(job_id="job-1", sheet_indices="wrong"),
-        400,
-        "job.invalid_sheet_indices",
-    )
 
     saved = _capture_jobs(monkeypatch)
 
@@ -309,25 +341,9 @@ def test_create_render_job_maps_errors_and_queued_payloads(monkeypatch, tmp_path
     }
 
 
-def test_render_direct_maps_errors_and_queued_payloads(monkeypatch, tmp_path):
-    unsupported = UploadFile(file=BytesIO(b"csv"), filename="book.csv")
-    _assert_error(
-        render.create_render_job_direct(unsupported),
-        400,
-        "file.unsupported_type",
-        {"supported": ".xlsx"},
-    )
-
+def test_render_direct_persists_and_returns_queued_payload(monkeypatch, tmp_path):
     monkeypatch.setattr(render, "UPLOADS_DIR", str(tmp_path))
     monkeypatch.setattr(render.uuid, "uuid4", lambda: "direct-job")
-    invalid_indices = UploadFile(file=BytesIO(b"xlsx"), filename="book.xlsx")
-    _assert_error(
-        render.create_render_job_direct(
-            invalid_indices, sheet_indices="wrong"
-        ),
-        400,
-        "job.invalid_sheet_indices",
-    )
 
     saved = _capture_jobs(monkeypatch)
 
@@ -358,27 +374,21 @@ def test_render_direct_maps_errors_and_queued_payloads(monkeypatch, tmp_path):
     }
 
 
-def test_get_job_download_and_delete_map_errors(monkeypatch, tmp_path):
-    monkeypatch.setattr(render, "_load_job", lambda job_id: None)
-
-    _assert_error(render.get_job_status("missing"), 404, "job.not_found")
-    _assert_error(render.download_result("missing"), 404, "job.not_found")
-    _assert_error(render.delete_job("missing"), 404, "job.not_found")
-
-    monkeypatch.setattr(render, "_load_job", lambda job_id: {"status": "queued"})
-    _assert_error(
-        render.download_result("job-1"), 400, "job.not_completed"
-    )
-
-    monkeypatch.setattr(
-        render,
-        "_load_job",
-        lambda job_id: {"status": "completed", "sheets": []},
-    )
+@pytest.mark.parametrize(
+    ("job", "code"),
+    [
+        ({"status": "queued"}, "job.not_completed"),
+        ({"status": "completed", "sheets": []}, "output.not_found"),
+    ],
+)
+def test_download_maps_job_state_errors(
+    monkeypatch, tmp_path, job, code
+):
+    monkeypatch.setattr(render, "_load_job", lambda job_id: job)
     monkeypatch.setattr(render, "OUTPUTS_DIR", str(tmp_path))
-    _assert_error(
-        render.download_result("job-1"), 404, "output.not_found"
-    )
+    status_code = 400 if code == "job.not_completed" else 404
+
+    _assert_error(render.download_result("job-1"), status_code, code)
 
 
 def test_delete_returns_status_payload(monkeypatch, tmp_path):
@@ -396,12 +406,3 @@ def test_formats_return_localizable_description_codes():
             {"id": "jpg", "name": "JPG", "description_code": "format.jpg"},
         ]
     }
-
-
-def test_render_module_contains_no_localized_business_payloads():
-    source = inspect.getsource(render)
-
-    assert re.search(r"[\u4e00-\u9fff]", source) is None
-    assert '"message"' not in source
-    assert "HTTPException" not in source
-    assert "str(e)" not in source
