@@ -36,11 +36,12 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t, tm } = useI18n()
 const showSeoContent = ref(false)
+let showTimer = null
 const features = computed(() => tm('seo.features'))
 const scenarios = computed(() => tm('seo.scenarios'))
 const usage = computed(() => tm('seo.usage'))
@@ -48,9 +49,17 @@ const faq = computed(() => tm('seo.faq'))
 
 onMounted(() => {
   // Show SEO content after initial render for better LCP
-  setTimeout(() => {
+  showTimer = setTimeout(() => {
+    showTimer = null
     showSeoContent.value = true
   }, 100)
+})
+
+onBeforeUnmount(() => {
+  if (showTimer !== null) {
+    clearTimeout(showTimer)
+    showTimer = null
+  }
 })
 </script>
 

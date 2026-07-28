@@ -33,6 +33,7 @@ describe('SeoContent', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.useRealTimers()
   })
 
@@ -87,6 +88,18 @@ describe('SeoContent', () => {
     expect(wrapper.text()).not.toContain('undefined')
   })
 
+  it('cancels the delayed display when unmounted before the timer expires', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const { wrapper } = mountSeoContent()
+
+    expect(vi.getTimerCount()).toBe(1)
+    wrapper.unmount()
+
+    expect(vi.getTimerCount()).toBe(0)
+    vi.advanceTimersByTime(100)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
   it('updates visible SEO content when the composer locale changes', async () => {
     const { i18n, wrapper } = mountSeoContent()
 
@@ -97,5 +110,9 @@ describe('SeoContent', () => {
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).toContain('What is SheetFlow?')
+    expect(wrapper.find('.content-section ul li').text()).toContain('Excel to image')
+    expect(wrapper.find('.scenario h3').text()).toBe('💰 Refund forms')
+    expect(wrapper.find('.content-section ol li').text()).toBe('Upload an .xlsx Excel file')
+    expect(wrapper.find('.faq-item h3').text()).toBe('Which Excel formats are supported?')
   })
 })
