@@ -12,6 +12,8 @@ RUN npm install
 COPY . .
 
 # Build the app
+ARG VITE_PUBLIC_SITE_URL
+ENV VITE_PUBLIC_SITE_URL=$VITE_PUBLIC_SITE_URL
 RUN npm run build
 
 # Production stage with nginx
