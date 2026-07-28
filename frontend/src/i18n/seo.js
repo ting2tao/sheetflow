@@ -65,7 +65,10 @@ function setLink(selector, identifyingAttributes, href) {
 export function applyLocalizedSeo(locale, { origin } = {}) {
   const resolvedLocale = SEO_METADATA[locale] ? locale : 'zh-CN'
   const metadata = SEO_METADATA[resolvedLocale]
-  const siteOrigin = new URL(origin ?? window.location.origin).origin
+  const configuredOrigin = import.meta.env.VITE_PUBLIC_SITE_URL
+  const siteOrigin = new URL(
+    origin || configuredOrigin || window.location.origin,
+  ).origin
   const pageUrl = `${siteOrigin}${metadata.path}`
   const imageUrl = `${siteOrigin}/og-image.png`
 

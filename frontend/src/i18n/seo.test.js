@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SEO_METADATA, applyLocalizedSeo } from './seo'
 
 const origin = 'https://sheetflow.example'
@@ -76,6 +76,10 @@ describe('applyLocalizedSeo', () => {
     document.documentElement.lang = ''
   })
 
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   it('replaces Chinese head metadata with complete English metadata without duplicates', () => {
     applyLocalizedSeo('zh-CN', { origin })
     applyLocalizedSeo('en-US', { origin })
@@ -150,7 +154,32 @@ describe('applyLocalizedSeo', () => {
     }
   })
 
-  it('uses the browser origin by default', () => {
+  it('prefers the configured public origin over the browser origin', () => {
+    vi.stubEnv('VITE_PUBLIC_SITE_URL', 'https://configured.example')
+
+    applyLocalizedSeo('en-US')
+
+    expect(linkHref('link[rel="canonical"]')).toBe(
+      'https://configured.example/en/',
+    )
+    expect(metaContent('meta[property="og:image"]')).toBe(
+      'https://configured.example/og-image.png',
+    )
+  })
+
+  it('prefers an explicit origin over the configured public origin', () => {
+    vi.stubEnv('VITE_PUBLIC_SITE_URL', 'https://configured.example')
+
+    applyLocalizedSeo('zh-CN', { origin: 'https://override.example' })
+
+    expect(linkHref('link[rel="canonical"]')).toBe(
+      'https://override.example/zh/',
+    )
+  })
+
+  it('uses the browser origin when the configured origin is empty', () => {
+    vi.stubEnv('VITE_PUBLIC_SITE_URL', '')
+
     applyLocalizedSeo('zh-CN')
 
     expect(linkHref('link[rel="canonical"]')).toBe(`${window.location.origin}/zh/`)

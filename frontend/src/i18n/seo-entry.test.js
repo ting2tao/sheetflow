@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { execFileSync } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -201,6 +201,42 @@ describe('SEO build configuration', () => {
     expect(
       config.define['import.meta.env.VITE_PUBLIC_SITE_URL'],
     ).toBe(JSON.stringify('https://sheetflow.example'))
+  })
+
+  test('embeds the normalized public origin in the production runtime bundle', async () => {
+    const temporaryRoot = await mkdtemp(
+      path.join(tmpdir(), 'sheetflow-seo-runtime-'),
+    )
+    const distDir = path.join(temporaryRoot, 'dist')
+    const viteBin = path.join(
+      frontendDir,
+      'node_modules/vite/bin/vite.js',
+    )
+
+    execFileSync(
+      process.execPath,
+      [viteBin, 'build', '--outDir', distDir, '--emptyOutDir'],
+      {
+        cwd: frontendDir,
+        env: {
+          ...process.env,
+          VITE_PUBLIC_SITE_URL: 'https://sheetflow.example:443///',
+        },
+      },
+    )
+
+    const assetNames = await readdir(path.join(distDir, 'assets'))
+    const mainBundleName = assetNames.find(name =>
+      /^main-.*\.js$/.test(name),
+    )
+    expect(mainBundleName).toBeDefined()
+
+    const mainBundle = await readFile(
+      path.join(distDir, 'assets', mainBundleName),
+      'utf8',
+    )
+    expect(mainBundle).toContain('https://sheetflow.example')
+    expect(mainBundle).not.toContain('https://sheetflow.example:443///')
   })
 
   test('replaces every SEO host token without mutating the source files', async () => {
