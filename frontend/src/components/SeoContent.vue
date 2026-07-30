@@ -1,95 +1,66 @@
 <template>
   <section class="seo-content" v-if="showSeoContent">
     <div class="content-section">
-      <h2>🎯 SheetFlow 是什么？</h2>
-      <p>
-        SheetFlow 是一款免费的在线 Excel 转图片工具。只需上传 Excel 文件，
-        设置分页规则，即可自动生成多张高质量图片并打包下载。
-      </p>
+      <h2>{{ t('seo.whatTitle') }}</h2>
+      <p>{{ t('seo.whatBody') }}</p>
 
-      <h2>✨ 核心功能</h2>
+      <h2>{{ t('seo.featuresTitle') }}</h2>
       <ul>
-        <li><strong>Excel 转图片</strong> - 支持 .xlsx 格式，保留表格样式</li>
-        <li><strong>智能分页</strong> - 自定义表头行数和每页数据行数</li>
-        <li><strong>固定表头</strong> - 每张图片都包含固定表头信息</li>
-        <li><strong>多格式输出</strong> - 支持 PNG 和 JPG 格式</li>
-        <li><strong>批量处理</strong> - 支持多 Sheet 一并处理</li>
-        <li><strong>一键下载</strong> - 自动打包 ZIP 文件</li>
+        <li v-for="(item, index) in features" :key="index">
+          <strong>{{ item[0] }}</strong> - {{ item[1] }}
+        </li>
       </ul>
 
-      <h2>📋 适用场景</h2>
+      <h2>{{ t('seo.scenariosTitle') }}</h2>
       <div class="scenarios">
-        <div class="scenario">
-          <h3>💰 退款单生成</h3>
-          <p>批量生成退款单图片，方便客服发送给客户</p>
-        </div>
-        <div class="scenario">
-          <h3>📦 订单截图</h3>
-          <p>将订单数据转换为图片，用于存档或分享</p>
-        </div>
-        <div class="scenario">
-          <h3>📊 数据报表</h3>
-          <p>将 Excel 报表转换为图片，便于展示和汇报</p>
-        </div>
-        <div class="scenario">
-          <h3>🎨 运营素材</h3>
-          <p>快速生成运营活动所需的表格图片素材</p>
+        <div v-for="(scenario, index) in scenarios" :key="index" class="scenario">
+          <h3>{{ scenario[0] }}</h3>
+          <p>{{ scenario[1] }}</p>
         </div>
       </div>
 
-      <h2>🚀 使用方法</h2>
+      <h2>{{ t('seo.usageTitle') }}</h2>
       <ol>
-        <li>上传 Excel 文件（.xlsx 格式）</li>
-        <li>选择要处理的 Sheet</li>
-        <li>设置表头行数和每页数据行数</li>
-        <li>选择输出格式（PNG 或 JPG）</li>
-        <li>点击"开始生成"</li>
-        <li>下载 ZIP 文件</li>
+        <li v-for="(step, index) in usage" :key="index">{{ step }}</li>
       </ol>
 
-      <h2>❓ 常见问题</h2>
+      <h2>{{ t('seo.faqTitle') }}</h2>
       <div class="faq">
-        <div class="faq-item">
-          <h3>支持哪些 Excel 格式？</h3>
-          <p>目前支持 .xlsx 格式。后续版本将支持 .xls 和 .csv 格式。</p>
-        </div>
-        <div class="faq-item">
-          <h3>支持复杂的 Excel 公式吗？</h3>
-          <p>SheetFlow 会读取公式的计算结果值，但不会重新计算公式。</p>
-        </div>
-        <div class="faq-item">
-          <h3>图片质量如何？</h3>
-          <p>默认使用 2x 分辨率生成，确保图片清晰。PNG 格式无损压缩，JPG 格式可调节质量。</p>
-        </div>
-        <div class="faq-item">
-          <h3>文件大小有限制吗？</h3>
-          <p>建议文件大小不超过 10MB，行数不超过 10000 行，以获得最佳体验。</p>
+        <div v-for="(item, index) in faq" :key="index" class="faq-item">
+          <h3>{{ item[0] }}</h3>
+          <p>{{ item[1] }}</p>
         </div>
       </div>
     </div>
   </section>
 </template>
 
-<script>
-import { ref, onMounted } from 'vue'
+<script setup>
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
-export default {
-  name: 'SeoContent',
-  setup() {
-    const showSeoContent = ref(false)
+const { t, tm } = useI18n()
+const showSeoContent = ref(false)
+let showTimer = null
+const features = computed(() => tm('seo.features'))
+const scenarios = computed(() => tm('seo.scenarios'))
+const usage = computed(() => tm('seo.usage'))
+const faq = computed(() => tm('seo.faq'))
 
-    onMounted(() => {
-      // Show SEO content after initial render for better LCP
-      setTimeout(() => {
-        showSeoContent.value = true
-      }, 100)
-    })
+onMounted(() => {
+  // Show SEO content after initial render for better LCP
+  showTimer = setTimeout(() => {
+    showTimer = null
+    showSeoContent.value = true
+  }, 100)
+})
 
-    return {
-      showSeoContent
-    }
+onBeforeUnmount(() => {
+  if (showTimer !== null) {
+    clearTimeout(showTimer)
+    showTimer = null
   }
-}
+})
 </script>
 
 <style scoped>

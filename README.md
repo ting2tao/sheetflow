@@ -23,6 +23,7 @@ English | [中文](./README_CN.md)
 - 📦 Automatic ZIP packaging for download
 - 🎨 Preserve table styles (fonts, colors, borders, merged cells)
 - 📱 Responsive web interface
+- 🌐 Chinese and English localized entry points
 
 ## 📸 Preview
 
@@ -58,7 +59,7 @@ cd sheetflow
 # Start services
 docker-compose up -d
 
-# Visit http://localhost
+# Visit http://localhost/zh/ or http://localhost/en/
 ```
 
 ### Local Development
@@ -90,17 +91,50 @@ cd frontend
 # Install dependencies
 npm install
 
-# Start development server
-npm run dev
+# Run the frontend test suite
+npm test
+
+# Start the development server with an explicit local public origin
+VITE_PUBLIC_SITE_URL=http://localhost:3000 npm run dev
 ```
 
-Visit http://localhost:3000
+Visit http://localhost:3000/zh/ or http://localhost:3000/en/. The Vite
+development server proxies `/api` requests to the backend on port 8000.
+`npm run dev` also works without this variable; the explicit form above keeps
+the development metadata URLs tied to the local server.
+
+To verify a production build, set `VITE_PUBLIC_SITE_URL` to the site's public
+HTTPS origin. The build normalizes a trailing slash, but omitting it is
+recommended:
+
+```bash
+cd frontend
+
+# Reserved example domain; use the real public origin for a deployment.
+VITE_PUBLIC_SITE_URL=https://sheetflow.example npm run build
+```
+
+The value is embedded at build time in the site's SEO metadata and generated
+crawler files.
 
 ### One-Click Start
 
 ```bash
 ./start-dev.sh
 ```
+
+## 🌐 Language URLs and Selection
+
+- `/zh/` is the Chinese entry point and `/en/` is the English entry point.
+  `/zh` and `/en` are canonicalized to their trailing-slash URLs in production.
+- Opening `/` chooses a language from the saved `sheetflow.locale` preference
+  first, then the browser's first preferred language. A Chinese browser language
+  selects Chinese; any other browser language selects English. If no browser
+  language is available, Chinese is the final fallback.
+- An explicit localized URL always determines the displayed language.
+- The language switcher updates the localized URL without reloading the app, so
+  an uploaded file, selected sheets, settings, and in-progress job state are
+  preserved.
 
 ## 📖 Usage
 
@@ -140,6 +174,12 @@ result.zip  →  All images packaged
                     Browser
                        │
                        ▼
+             ┌──────────────────┐
+             │ Vue 3 + vue-i18n │
+             │  /zh/ and /en/   │
+             └────────┬─────────┘
+                      │ /api
+                      ▼
                ┌──────────────┐
                │   FastAPI    │
                │    Server    │
@@ -190,7 +230,12 @@ sheetflow/
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
+│   │   ├── components/          # UI components, including language switcher
+│   │   ├── i18n/                # Locale selection and translations
 │   │   └── App.vue              # Main application component
+│   ├── en/index.html            # English SEO entry point
+│   ├── zh/index.html            # Chinese SEO entry point
+│   ├── public/                  # Crawler files and social sharing asset
 │   ├── package.json
 │   ├── nginx.conf
 │   └── Dockerfile
@@ -205,6 +250,30 @@ sheetflow/
 
 ## 🔌 API Reference
 
+### Upload a Workbook
+
+```http
+POST /api/upload
+Content-Type: multipart/form-data
+```
+
+**Parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| file | File | Yes | Excel file (`.xlsx`) |
+
+**Response:**
+```json
+{
+  "job_id": "abc123",
+  "filename": "report.xlsx",
+  "sheets": [
+    {"index": 0, "name": "Sheet1", "rows": 25, "columns": 6}
+  ]
+}
+```
+
 ### Create Render Job
 
 ```http
@@ -216,19 +285,20 @@ Content-Type: multipart/form-data
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| file | File | Yes | - | Excel file (.xlsx) |
+| job_id | string | Yes | - | Job ID returned by `/api/upload` |
 | header_rows | int | No | 1 | Number of header rows |
 | page_size | int | No | 10 | Data rows per page |
-| format | string | No | png | Output format (png/jpg) |
-| quality | int | No | 90 | JPG quality (1-100) |
-| sheet_index | int | No | 0 | Sheet index |
+| format | string | No | png | Output format (`png`/`jpg`) |
+| quality | int | No | - | JPG quality (1-100) |
+| sheet_indices | string | No | all | Comma-separated sheet indexes or `all` |
 
 **Response:**
 ```json
 {
   "job_id": "abc123",
   "status": "queued",
-  "message": "任务已创建"
+  "message_code": "job.queued",
+  "message_params": {}
 }
 ```
 
@@ -243,7 +313,8 @@ GET /api/job/{job_id}
 {
   "job_id": "abc123",
   "status": "completed",
-  "message": "完成！共生成 10 张图片",
+  "message_code": "job.completed",
+  "message_params": {"sheets": 1, "pages": 10},
   "total_pages": 10,
   "download_url": "/api/download/abc123"
 }
@@ -254,10 +325,9 @@ GET /api/job/{job_id}
 | Status | Description |
 |--------|-------------|
 | queued | Waiting to process |
+| uploaded | Workbook uploaded |
 | parsing | Parsing Excel file |
-| paginating | Processing pagination |
-| rendering | Generating HTML |
-| screenshotting | Capturing screenshots |
+| processing | Paginating and generating images |
 | zipping | Creating ZIP file |
 | completed | Processing complete |
 | error | Processing failed |

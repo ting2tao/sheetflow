@@ -16,9 +16,10 @@ import zipfile
 from datetime import datetime, timedelta
 from typing import Optional, Literal, List
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form
 from fastapi.responses import FileResponse
 
+from app.api.messages import api_error, job_message
 from app.services.excel_parser import parse_excel, get_sheet_list, WorkbookModel
 from app.services.paginator import paginate
 from app.services.html_renderer import render_page_html
@@ -146,7 +147,7 @@ async def _process_render_job(
         _save_job(job_id, {
             "job_id": job_id,
             "status": "parsing",
-            "message": "正在解析Excel文件...",
+            **job_message("job.parsing"),
             "created_at": datetime.now().isoformat(),
         })
 
@@ -157,7 +158,7 @@ async def _process_render_job(
             _save_job(job_id, {
                 "job_id": job_id,
                 "status": "error",
-                "message": "Excel文件为空或无法解析",
+                **job_message("job.empty_workbook"),
                 "created_at": datetime.now().isoformat(),
             })
             return
@@ -178,7 +179,7 @@ async def _process_render_job(
             _save_job(job_id, {
                 "job_id": job_id,
                 "status": "error",
-                "message": "没有找到要处理的Sheet",
+                **job_message("job.no_sheets"),
                 "created_at": datetime.now().isoformat(),
             })
             return
@@ -197,7 +198,7 @@ async def _process_render_job(
         _save_job(job_id, {
             "job_id": job_id,
             "status": "processing",
-            "message": f"准备处理 {total_sheets} 个Sheet...",
+            **job_message("job.preparing", sheets=total_sheets),
             "total_sheets": total_sheets,
             "sheets_processed": 0,
             "current_sheet": "",
@@ -232,7 +233,12 @@ async def _process_render_job(
             _save_job(job_id, {
                 "job_id": job_id,
                 "status": "processing",
-                "message": f"正在处理: {sheet_name} ({sheets_processed + 1}/{total_sheets})",
+                **job_message(
+                    "job.processing_sheet",
+                    sheet_name=sheet_name,
+                    current=sheets_processed + 1,
+                    total=total_sheets,
+                ),
                 "total_sheets": total_sheets,
                 "sheets_processed": sheets_processed,
                 "current_sheet": sheet_name,
@@ -251,7 +257,12 @@ async def _process_render_job(
                 _save_job(job_id, {
                     "job_id": job_id,
                     "status": "processing",
-                    "message": f"正在处理: {sheet_name} - 第 {current}/{total} 页",
+                    **job_message(
+                        "job.processing_sheet_page",
+                        sheet_name=sheet_name,
+                        current=current,
+                        total=total,
+                    ),
                     "total_sheets": total_sheets,
                     "sheets_processed": sheets_processed,
                     "current_sheet": sheet_name,
@@ -290,7 +301,7 @@ async def _process_render_job(
             _save_job(job_id, {
                 "job_id": job_id,
                 "status": "error",
-                "message": "所有Sheet都没有数据",
+                **job_message("job.empty_sheets"),
                 "created_at": datetime.now().isoformat(),
             })
             return
@@ -299,7 +310,7 @@ async def _process_render_job(
         _save_job(job_id, {
             "job_id": job_id,
             "status": "zipping",
-            "message": "正在打包ZIP...",
+            **job_message("job.zipping"),
             "total_pages": total_pages,
             "created_at": datetime.now().isoformat(),
         })
@@ -321,7 +332,11 @@ async def _process_render_job(
         _save_job(job_id, {
             "job_id": job_id,
             "status": "completed",
-            "message": f"完成！共处理 {len(sheets_info)} 个Sheet，生成 {total_pages} 张图片",
+            **job_message(
+                "job.completed",
+                sheets=len(sheets_info),
+                pages=total_pages,
+            ),
             "total_pages": total_pages,
             "total_sheets": len(sheets_info),
             "sheets": sheets_info,
@@ -330,13 +345,13 @@ async def _process_render_job(
             "completed_at": datetime.now().isoformat(),
         })
 
-    except Exception as e:
+    except Exception:
         import traceback
         traceback.print_exc()
         _save_job(job_id, {
             "job_id": job_id,
             "status": "error",
-            "message": f"处理失败: {str(e)}",
+            **job_message("job.failed"),
             "created_at": datetime.now().isoformat(),
         })
     finally:
@@ -353,17 +368,17 @@ async def get_sheets_for_job(job_id: str):
     """Get list of sheets in the uploaded Excel file."""
     job = _load_job(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise api_error(404, "job.not_found")
 
     file_path = job.get("file_path")
     if not file_path or not os.path.exists(file_path):
-        raise HTTPException(status_code=400, detail="文件不存在，请重新上传")
+        raise api_error(400, "file.not_found")
 
     try:
         sheets = get_sheet_list(file_path)
         return {"sheets": sheets}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"解析失败: {str(e)}")
+    except Exception:
+        raise api_error(500, "file.parse_failed")
 
 
 @router.post("/upload")
@@ -374,10 +389,7 @@ async def upload_file(file: UploadFile = File(...)):
     """
     # Validate file type
     if not file.filename or not file.filename.lower().endswith('.xlsx'):
-        raise HTTPException(
-            status_code=400,
-            detail="仅支持 .xlsx 格式的Excel文件"
-        )
+        raise api_error(400, "file.unsupported_type", supported=".xlsx")
 
     # Generate job ID
     job_id = str(uuid.uuid4())[:8]
@@ -391,15 +403,15 @@ async def upload_file(file: UploadFile = File(...)):
     # Quick parse to get sheet list (without parsing all data)
     try:
         sheets = get_sheet_list(upload_path)
-    except Exception as e:
+    except Exception:
         os.remove(upload_path)
-        raise HTTPException(status_code=400, detail=f"Excel解析失败: {str(e)}")
+        raise api_error(400, "file.parse_failed")
 
     # Save job info
     _save_job(job_id, {
         "job_id": job_id,
         "status": "uploaded",
-        "message": "文件已上传，请选择要处理的Sheet",
+        **job_message("job.uploaded"),
         "filename": file.filename,
         "file_path": upload_path,
         "sheets": sheets,
@@ -431,11 +443,11 @@ async def create_render_job(
     # Load job info
     job = _load_job(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="任务不存在，请重新上传文件")
+        raise api_error(404, "job.not_found")
 
     file_path = job.get("file_path")
     if not file_path or not os.path.exists(file_path):
-        raise HTTPException(status_code=400, detail="文件不存在，请重新上传")
+        raise api_error(400, "file.not_found")
 
     # Parse sheet indices
     if sheet_indices == "all":
@@ -444,13 +456,13 @@ async def create_render_job(
         try:
             indices = [int(x.strip()) for x in sheet_indices.split(",")]
         except ValueError:
-            raise HTTPException(status_code=400, detail="sheet_indices 格式错误")
+            raise api_error(400, "job.invalid_sheet_indices")
 
     # Update job status
     _save_job(job_id, {
         **job,
         "status": "queued",
-        "message": "任务已创建，等待处理...",
+        **job_message("job.queued"),
         "header_rows": header_rows,
         "page_size": page_size,
         "format": format,
@@ -471,7 +483,7 @@ async def create_render_job(
     return {
         "job_id": job_id,
         "status": "queued",
-        "message": "任务已创建",
+        **job_message("job.queued"),
     }
 
 
@@ -487,10 +499,7 @@ async def create_render_job_direct(
     """Direct render without sheet selection (legacy endpoint)."""
     # Validate file type
     if not file.filename or not file.filename.lower().endswith('.xlsx'):
-        raise HTTPException(
-            status_code=400,
-            detail="仅支持 .xlsx 格式的Excel文件"
-        )
+        raise api_error(400, "file.unsupported_type", supported=".xlsx")
 
     # Generate job ID
     job_id = str(uuid.uuid4())[:8]
@@ -508,13 +517,13 @@ async def create_render_job_direct(
         try:
             indices = [int(x.strip()) for x in sheet_indices.split(",")]
         except ValueError:
-            raise HTTPException(status_code=400, detail="sheet_indices 格式错误")
+            raise api_error(400, "job.invalid_sheet_indices")
 
     # Save initial job status
     _save_job(job_id, {
         "job_id": job_id,
         "status": "queued",
-        "message": "任务已创建，等待处理...",
+        **job_message("job.queued"),
         "filename": file.filename,
         "file_path": upload_path,
         "header_rows": header_rows,
@@ -537,7 +546,7 @@ async def create_render_job_direct(
     return {
         "job_id": job_id,
         "status": "queued",
-        "message": "任务已创建",
+        **job_message("job.queued"),
     }
 
 
@@ -546,7 +555,7 @@ async def get_job_status(job_id: str):
     """Get the status of a render job."""
     job = _load_job(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise api_error(404, "job.not_found")
     return job
 
 
@@ -555,14 +564,14 @@ async def download_result(job_id: str):
     """Download the ZIP file for a completed job."""
     job = _load_job(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise api_error(404, "job.not_found")
 
     if job.get("status") != "completed":
-        raise HTTPException(status_code=400, detail="任务尚未完成")
+        raise api_error(400, "job.not_completed")
 
     zip_path = os.path.join(OUTPUTS_DIR, f"{job_id}.zip")
     if not os.path.exists(zip_path):
-        raise HTTPException(status_code=404, detail="ZIP文件不存在")
+        raise api_error(404, "output.not_found")
 
     # Generate filename based on sheets processed
     sheets = job.get("sheets", [])
@@ -589,7 +598,7 @@ async def delete_job(job_id: str):
     """Delete a job and its associated files."""
     job = _load_job(job_id)
     if not job:
-        raise HTTPException(status_code=404, detail="任务不存在")
+        raise api_error(404, "job.not_found")
 
     # Delete job file
     job_path = os.path.join(JOBS_DIR, f"{job_id}.json")
@@ -611,7 +620,7 @@ async def delete_job(job_id: str):
     if os.path.exists(zip_path):
         os.remove(zip_path)
 
-    return {"message": "任务已删除"}
+    return {"status": "deleted"}
 
 
 @router.get("/formats")
@@ -619,7 +628,7 @@ async def get_supported_formats():
     """Get list of supported output formats."""
     return {
         "formats": [
-            {"id": "png", "name": "PNG", "description": "无损压缩，质量最好"},
-            {"id": "jpg", "name": "JPG", "description": "有损压缩，文件更小"},
+            {"id": "png", "name": "PNG", "description_code": "format.png"},
+            {"id": "jpg", "name": "JPG", "description_code": "format.jpg"},
         ]
     }

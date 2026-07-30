@@ -23,6 +23,7 @@
 - 📦 自动打包 ZIP 下载
 - 🎨 保留表格样式（字体、颜色、边框、合并单元格）
 - 📱 响应式 Web 界面
+- 🌐 提供中文和英文独立入口
 
 ## 📸 界面预览
 
@@ -58,7 +59,7 @@ cd sheetflow
 # 启动服务
 docker-compose up -d
 
-# 访问 http://localhost
+# 访问 http://localhost/zh/ 或 http://localhost/en/
 ```
 
 ### 本地开发
@@ -90,17 +91,45 @@ cd frontend
 # 安装依赖
 npm install
 
-# 启动开发服务器
-npm run dev
+# 运行前端测试
+npm test
+
+# 使用明确的本地公开地址启动开发服务器
+VITE_PUBLIC_SITE_URL=http://localhost:3000 npm run dev
 ```
 
-访问 http://localhost:3000
+访问 http://localhost:3000/zh/ 或 http://localhost:3000/en/。Vite 开发服务器会将
+`/api` 请求代理到 8000 端口的后端。不设置该变量时也可以直接运行
+`npm run dev`；上面的明确写法可确保开发环境的元数据 URL 指向本地服务器。
+
+验证生产构建时，将 `VITE_PUBLIC_SITE_URL` 设置为网站对外公开的 HTTPS 源站地址。
+构建会自动规范化末尾斜杠，但建议配置时省略：
+
+```bash
+cd frontend
+
+# 这是保留的示例域名；实际部署请使用真实的公开源站地址。
+VITE_PUBLIC_SITE_URL=https://sheetflow.example npm run build
+```
+
+该值会在构建时写入站点的 SEO 元数据和生成的爬虫文件。
 
 ### 一键启动
 
 ```bash
 ./start-dev.sh
 ```
+
+## 🌐 语言 URL 与选择规则
+
+- `/zh/` 是中文入口，`/en/` 是英文入口；生产环境会将 `/zh` 和 `/en`
+  规范重定向到末尾带斜杠的 URL。
+- 访问 `/` 时，首先读取已保存的 `sheetflow.locale` 语言偏好，然后读取浏览器
+  第一偏好语言。浏览器语言以中文开头时选择中文，否则选择英文；浏览器语言也
+  不可用时，最终回退到中文。
+- 显式访问本地化 URL 时，URL 始终决定页面所用语言。
+- 语言切换器不会刷新应用，只会更新本地化 URL，因此已上传文件、已选工作表、
+  参数设置和正在处理的任务状态都会保留。
 
 ## 📖 使用说明
 
@@ -140,6 +169,12 @@ result.zip  →  所有图片打包
                     浏览器
                        │
                        ▼
+             ┌──────────────────┐
+             │ Vue 3 + vue-i18n │
+             │  /zh/ 和 /en/    │
+             └────────┬─────────┘
+                      │ /api
+                      ▼
                ┌──────────────┐
                │   FastAPI    │
                │    Server    │
@@ -190,7 +225,12 @@ sheetflow/
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
+│   │   ├── components/          # UI 组件（含语言切换器）
+│   │   ├── i18n/                # 语言选择与翻译
 │   │   └── App.vue              # 主应用组件
+│   ├── en/index.html            # 英文 SEO 入口
+│   ├── zh/index.html            # 中文 SEO 入口
+│   ├── public/                  # 爬虫文件和社交分享图片
 │   ├── package.json
 │   ├── nginx.conf
 │   └── Dockerfile
@@ -205,6 +245,30 @@ sheetflow/
 
 ## 🔌 API 接口
 
+### 上传工作簿
+
+```http
+POST /api/upload
+Content-Type: multipart/form-data
+```
+
+**参数:**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| file | File | 是 | Excel 文件（`.xlsx`） |
+
+**响应:**
+```json
+{
+  "job_id": "abc123",
+  "filename": "report.xlsx",
+  "sheets": [
+    {"index": 0, "name": "Sheet1", "rows": 25, "columns": 6}
+  ]
+}
+```
+
 ### 创建渲染任务
 
 ```http
@@ -216,19 +280,20 @@ Content-Type: multipart/form-data
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| file | File | 是 | - | Excel 文件 (.xlsx) |
+| job_id | string | 是 | - | `/api/upload` 返回的任务 ID |
 | header_rows | int | 否 | 1 | 表头行数 |
 | page_size | int | 否 | 10 | 每页数据行数 |
-| format | string | 否 | png | 输出格式 (png/jpg) |
-| quality | int | 否 | 90 | JPG 质量 (1-100) |
-| sheet_index | int | 否 | 0 | Sheet 索引 |
+| format | string | 否 | png | 输出格式（`png`/`jpg`） |
+| quality | int | 否 | - | JPG 质量（1-100） |
+| sheet_indices | string | 否 | all | 逗号分隔的工作表索引或 `all` |
 
 **响应:**
 ```json
 {
   "job_id": "abc123",
   "status": "queued",
-  "message": "任务已创建"
+  "message_code": "job.queued",
+  "message_params": {}
 }
 ```
 
@@ -243,7 +308,8 @@ GET /api/job/{job_id}
 {
   "job_id": "abc123",
   "status": "completed",
-  "message": "完成！共生成 10 张图片",
+  "message_code": "job.completed",
+  "message_params": {"sheets": 1, "pages": 10},
   "total_pages": 10,
   "download_url": "/api/download/abc123"
 }
@@ -254,10 +320,9 @@ GET /api/job/{job_id}
 | 状态 | 说明 |
 |------|------|
 | queued | 等待处理 |
+| uploaded | 工作簿已上传 |
 | parsing | 解析 Excel |
-| paginating | 分页处理 |
-| rendering | 生成 HTML |
-| screenshotting | 截图中 |
+| processing | 分页并生成图片 |
 | zipping | 打包 ZIP |
 | completed | 完成 |
 | error | 失败 |

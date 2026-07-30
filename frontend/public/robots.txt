@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /download/
 
-Sitemap: https://sheetflow.yourdomain.com/sitemap.xml
+Sitemap: __SHEETFLOW_PUBLIC_SITE_URL__/sitemap.xml

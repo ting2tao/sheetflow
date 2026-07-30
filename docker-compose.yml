@@ -23,6 +23,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_PUBLIC_SITE_URL: ${VITE_PUBLIC_SITE_URL:-http://localhost}
     container_name: sheetflow-frontend
     ports:
       - "80:80"
